@@ -2,6 +2,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
+#include <chrono>
 
 
 using namespace std;
@@ -112,9 +113,16 @@ void PointcloudClustering::expandCluster(std::vector<Point *> &neighbors, std::v
 void PointcloudClustering::nextContainer(Container &c) {
 
     if (c.getDataType() == CompactPointCloud::ID()) {
+
+
+
+
+
         CompactPointCloud cpc = c.getData<CompactPointCloud>();
 
         m_points = transform(cpc);
+
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
         std::vector<std::vector<Point *>> clusters;
         uint32_t c_num = 0;
@@ -140,11 +148,19 @@ void PointcloudClustering::nextContainer(Container &c) {
             }
         }
 
-        cout << "Clusters Num: " << clusters.size() << endl;
-        for (uint32_t i = 0; i < clusters.size(); i++) {
-            cout << clusters[i].size() << endl;
-        }
-        cout << "--------------------------" << endl << endl;
+        std::chrono::steady_clock::time_point end= std::chrono::steady_clock::now();
+
+
+
+        double millis = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000.0;
+        millis+= std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count() /1000000.0;
+
+        std::cout << "Time difference = " << millis <<std::endl;
+        //cout << "Clusters Num: " << clusters.size() << endl;
+        //for (uint32_t i = 0; i < clusters.size(); i++) {
+        //    cout << clusters[i].size() << endl;
+        //}
+        //cout << "--------------------------" << endl << endl;
 
         cv::Mat image(800, 800, CV_8UC3, cv::Scalar(0, 0, 0));
         unsigned char *input = (unsigned char *) (image.data);
