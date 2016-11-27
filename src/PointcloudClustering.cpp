@@ -2,6 +2,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
+#include <list>
 #include <chrono>
 
 
@@ -52,17 +53,18 @@ std::vector<std::vector<Point>> PointcloudClustering::transform(CompactPointClou
     return points;
 }
 
-std::vector<Point *> PointcloudClustering::regionQuery(int i, int j, double eps) {
+std::vector<Point *> PointcloudClustering::regionQuery(Point *point, double eps) {
     //cout<<"Start---------------------------: "<<endl;
     int didx = 3;
     std::vector<Point *> collection;
-    float distance = m_points[j][i].getMeasurement();
+    float distance = point->getMeasurement();
+    int i = point->getI();
     for (int k = max(0, i - didx); k < min(i + didx, (int) m_points[0].size()); k++) {
         for (int l = 0; l < 16; l++) {
-            float z = m_points[j][i].getPos()[2];
+            float z = point->getPos()[2];
             if (0 > z && z > -2) {
                 //cout<<"Dist: "<<distance<<"   Dist Comp: "<<m_points[j][i].get2Distance(m_points[l][k])  <<  endl;
-                if (m_points[j][i].get2Distance(m_points[l][k]) < eps) {
+                if (point->get2Distance(m_points[l][k]) < eps) {
                     collection.push_back(&m_points[l][k]);
                 }
             }
@@ -74,12 +76,12 @@ std::vector<Point *> PointcloudClustering::regionQuery(int i, int j, double eps)
 }
 
 
-//std::vector<Point *> PointcloudClustering::regionQuery(int i, int j, double eps) {
+//std::vector<Point *> PointcloudClustering::regionQuery(Point *point, double eps) {
 //    //cout<<"Start---------------------------: "<<endl;
 //    std::vector<Point *> collection;
 //    for (int k = 0; k < m_points[0].size(); k++) {
 //        for (int l = 0; l < 16; l++) {
-//            if (m_points[j][i].get2Distance(m_points[l][k]) < eps)
+//            if (point->get2Distance(m_points[l][k]) < eps)
 //                collection.push_back(&m_points[l][k]);
 //        }
 //    }
@@ -95,7 +97,7 @@ void PointcloudClustering::expandCluster(std::vector<Point *> &neighbors, std::v
         //cout<<"neighbood Size: " << (neighbors.size()) <<  "  Visited: "<< point->isVisited()<<endl;
         if (!point->isVisited()) {
             point->setVisited(true);
-            std::vector<Point *> collection = regionQuery(point->getI(), point->getJ(), 0.50);
+            std::vector<Point *> collection = regionQuery(point, 0.50);
             // if(collection.size() > 0)
             //     cout << "neighbors_ext : " << collection.size() << endl;
             if (collection.size() > 5) {
@@ -115,9 +117,6 @@ void PointcloudClustering::nextContainer(Container &c) {
     if (c.getDataType() == CompactPointCloud::ID()) {
 
 
-
-
-
         CompactPointCloud cpc = c.getData<CompactPointCloud>();
 
         m_points = transform(cpc);
@@ -132,7 +131,7 @@ void PointcloudClustering::nextContainer(Container &c) {
                 Point *point = &m_points[j][i];
                 if (!point->isVisited()) {
                     point->setVisited(true);
-                    std::vector<Point *> collection = regionQuery(i, j, 0.50);
+                    std::vector<Point *> collection = regionQuery(point, 0.50);
                     //if(collection.size() > 0)
                     //    cout << "neighbors : " << collection.size() << endl;
                     if (collection.size() > 5) {
@@ -148,14 +147,13 @@ void PointcloudClustering::nextContainer(Container &c) {
             }
         }
 
-        std::chrono::steady_clock::time_point end= std::chrono::steady_clock::now();
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
 
+        double millis = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000.0;
+        millis += std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1000000.0;
 
-        double millis = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000.0;
-        millis+= std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count() /1000000.0;
-
-        std::cout << "Time difference = " << millis <<std::endl;
+        std::cout << "Time difference = " << millis << std::endl;
         //cout << "Clusters Num: " << clusters.size() << endl;
         //for (uint32_t i = 0; i < clusters.size(); i++) {
         //    cout << clusters[i].size() << endl;
@@ -170,11 +168,11 @@ void PointcloudClustering::nextContainer(Container &c) {
                 int x = static_cast<int>(point->getPos()[0] * 8) + 400;
                 int y = static_cast<int>(point->getPos()[1] * 8) + 400;
                 if ((x < 800) && (y < 800) && (y >= 0) && (x >= 0)) {
-                   // if (point->getMeasurement() > 1 && ( point->getPos()[3] <0  && point->getPos()[3] > -1)) {
-                        image.at<cv::Vec3b>(y, x)[0] = 255;
-                        image.at<cv::Vec3b>(y, x)[1] = 255;
-                        image.at<cv::Vec3b>(y, x)[2] = 255;
-                  //  }
+                    // if (point->getMeasurement() > 1 && ( point->getPos()[3] <0  && point->getPos()[3] > -1)) {
+                    image.at<cv::Vec3b>(y, x)[0] = 255;
+                    image.at<cv::Vec3b>(y, x)[1] = 255;
+                    image.at<cv::Vec3b>(y, x)[2] = 255;
+                    //  }
 
                 }
 

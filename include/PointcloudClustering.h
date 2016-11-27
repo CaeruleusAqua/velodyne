@@ -48,7 +48,7 @@ private:
 
     std::vector<std::vector<Point>> transform(odcore::data::CompactPointCloud cpc);
 
-    std::vector<Point*> regionQuery(int i, int j, double eps);
+    std::vector<Point*> regionQuery(Point *point, double eps);
 
     void expandCluster(std::vector<Point*> &neighbors, std::vector<Point*> &cluster);
 
