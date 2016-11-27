@@ -19,6 +19,8 @@ public:
 
     Point(float x, float y, float z, float azimuth, float measurement);
 
+    Point();
+
     friend std::ostream &operator<<(std::ostream &outputStream, const Point &p);
 
     void setX(float x);
@@ -33,7 +35,7 @@ public:
 
     float getMeasurement();
 
-    float get2Distance(Point a);
+    float get2Distance(Point &a);
 
     void setIndex(int i, int j);
 

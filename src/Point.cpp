@@ -17,6 +17,14 @@ Point::Point(float x, float y, float z, float azimuth, float measurement) {
     clustered = false;
 }
 
+
+
+Point::Point() {
+    m_visited = false;
+    m_noise = false;
+    clustered = false;
+}
+
 void Point::setX(float x) {
     m_pos[0] = x;
 }
@@ -41,7 +49,7 @@ float Point::getMeasurement() {
     return m_measurement;
 }
 
-float Point::get2Distance(Point a) {
+float Point::get2Distance(Point &a) {
     float x = getPos()[0] - a.getPos()[0];
     float y = getPos()[1] - a.getPos()[1];
     return std::sqrt(x * x + y * y);

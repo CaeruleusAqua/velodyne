@@ -6,6 +6,8 @@
 #include "Utils.h"
 #include "Point.h"
 #include <iostream>
+#include <array>
+#include "dbscan.h"
 
 class PointcloudClustering : public odcore::base::module::DataTriggeredConferenceClientModule {
 private:
@@ -46,11 +48,13 @@ private:
 
     virtual void tearDown();
 
-    std::vector<std::vector<Point>> transform(odcore::data::CompactPointCloud cpc);
+    void transform(odcore::data::CompactPointCloud &cpc);
 
-    std::vector<Point*> regionQuery(Point *point, double eps);
+    Point m_points[2000][16];
+    unsigned int m_cloudSize;
 
-    void expandCluster(std::vector<Point*> &neighbors, std::vector<Point*> &cluster);
 
-    std::vector<std::vector<Point>> m_points;
+    static constexpr float m_eps = 1000;
+    static constexpr uint32_t m_minPts = 20;
+
 };

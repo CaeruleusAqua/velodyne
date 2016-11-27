@@ -2,8 +2,8 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
-#include <list>
 #include <chrono>
+#include "dbscan.h"
 
 
 using namespace std;
@@ -13,7 +13,7 @@ using namespace odcore::base::module;
 using namespace odcore::data;
 
 PointcloudClustering::PointcloudClustering(const int32_t &argc, char **argv) :
-        DataTriggeredConferenceClientModule(argc, argv, "PointcloudClustering") {}
+        DataTriggeredConferenceClientModule(argc, argv, "PointcloudClustering") {};
 
 PointcloudClustering::~PointcloudClustering() {}
 
@@ -27,12 +27,14 @@ void PointcloudClustering::tearDown() {
 }
 
 
-std::vector<std::vector<Point>> PointcloudClustering::transform(CompactPointCloud cpc) {
+void PointcloudClustering::transform(CompactPointCloud &cpc) {
+    max(2, 4);
     static const int maping[] = {-15, -13, -11, -9, -7, -5, -3, -1, 1, 3, 5, 7, 9, 11, 13, 15};
     std::string distances = cpc.getDistances();
-    vector<double> azimuth_range = utils::linspace(utils::deg2rad(cpc.getStartAzimuth()), utils::deg2rad(cpc.getEndAzimuth()), distances.size() / 2 / 16);
+    m_cloudSize = distances.size() / 2 / 16;
+    vector<double> azimuth_range = utils::linspace(utils::deg2rad(cpc.getStartAzimuth()), utils::deg2rad(cpc.getEndAzimuth()), m_cloudSize);
     const half *data = reinterpret_cast<const half *>(distances.c_str());
-    std::vector<std::vector<Point>> points(16);
+
     for (uint32_t i = 0; i < distances.size() / 2; i += 16) {
         for (uint32_t offset = 0; offset < 16; offset++) {
             float measurement = static_cast<float>(data[i + offset]);
@@ -41,111 +43,31 @@ std::vector<std::vector<Point>> PointcloudClustering::transform(CompactPointClou
             float x = xy_range * sin(azimuth);
             float y = xy_range * cos(azimuth);
             float z = measurement * sin(static_cast<float>(utils::deg2rad(maping[offset])));
-            Point point(x, y, z, measurement, azimuth);
-            point.setIndex(i / 16, offset);
+            m_points[i / 16][offset] = Point(x, y, z, measurement, azimuth);
+            m_points[i / 16][offset].setIndex(i / 16, offset);
             if (measurement <= 1 || !(z < 10 && z > -2)) {
-                point.setVisited(true);
-                point.clustered = true;
+                m_points[i / 16][offset].setVisited(true);
+                m_points[i / 16][offset].clustered = true;
             }
-            points[offset].push_back(point);
-        }
-    }
-    return points;
-}
-
-std::vector<Point *> PointcloudClustering::regionQuery(Point *point, double eps) {
-    //cout<<"Start---------------------------: "<<endl;
-    int didx = 3;
-    std::vector<Point *> collection;
-    float distance = point->getMeasurement();
-    int i = point->getI();
-    for (int k = max(0, i - didx); k < min(i + didx, (int) m_points[0].size()); k++) {
-        for (int l = 0; l < 16; l++) {
-            float z = point->getPos()[2];
-            if (0 > z && z > -2) {
-                //cout<<"Dist: "<<distance<<"   Dist Comp: "<<m_points[j][i].get2Distance(m_points[l][k])  <<  endl;
-                if (point->get2Distance(m_points[l][k]) < eps) {
-                    collection.push_back(&m_points[l][k]);
-                }
-            }
-        }
-
-    }
-    //cout<<"END---------------------------: "<<endl;
-    return collection;
-}
-
-
-//std::vector<Point *> PointcloudClustering::regionQuery(Point *point, double eps) {
-//    //cout<<"Start---------------------------: "<<endl;
-//    std::vector<Point *> collection;
-//    for (int k = 0; k < m_points[0].size(); k++) {
-//        for (int l = 0; l < 16; l++) {
-//            if (point->get2Distance(m_points[l][k]) < eps)
-//                collection.push_back(&m_points[l][k]);
-//        }
-//    }
-//    return collection;
-//}
-
-
-void PointcloudClustering::expandCluster(std::vector<Point *> &neighbors, std::vector<Point *> &cluster) {
-    while (!neighbors.empty()) {
-        Point *point = neighbors.back();
-        neighbors.pop_back();
-
-        //cout<<"neighbood Size: " << (neighbors.size()) <<  "  Visited: "<< point->isVisited()<<endl;
-        if (!point->isVisited()) {
-            point->setVisited(true);
-            std::vector<Point *> collection = regionQuery(point, 0.50);
-            // if(collection.size() > 0)
-            //     cout << "neighbors_ext : " << collection.size() << endl;
-            if (collection.size() > 5) {
-                neighbors.insert(neighbors.end(), collection.begin(), collection.end());
-            }
-        }
-        if (!point->clustered) {
-            cluster.push_back(point);
-            point->clustered = true;
         }
     }
 }
 
 
 void PointcloudClustering::nextContainer(Container &c) {
-
     if (c.getDataType() == CompactPointCloud::ID()) {
 
 
         CompactPointCloud cpc = c.getData<CompactPointCloud>();
 
-        m_points = transform(cpc);
+        transform(cpc);
 
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
+        DbScan dbScan = DbScan(m_points, m_cloudSize);
+
         std::vector<std::vector<Point *>> clusters;
-        uint32_t c_num = 0;
-
-        for (int i = 0; i < m_points[0].size(); i++) {
-            for (int j = 0; j < 16; j++) {
-                Point *point = &m_points[j][i];
-                if (!point->isVisited()) {
-                    point->setVisited(true);
-                    std::vector<Point *> collection = regionQuery(point, 0.50);
-                    //if(collection.size() > 0)
-                    //    cout << "neighbors : " << collection.size() << endl;
-                    if (collection.size() > 5) {
-                        std::vector<Point *> cluster;
-                        cluster.push_back(point);
-                        point->clustered = true;
-
-                        expandCluster(collection, cluster);
-                        clusters.push_back(cluster);
-                    }
-
-                }
-            }
-        }
+        dbScan.getClusters(clusters);
 
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
@@ -161,10 +83,10 @@ void PointcloudClustering::nextContainer(Container &c) {
         //cout << "--------------------------" << endl << endl;
 
         cv::Mat image(800, 800, CV_8UC3, cv::Scalar(0, 0, 0));
-        unsigned char *input = (unsigned char *) (image.data);
-        for (int i = 0; i < m_points[0].size(); i++) {
+        unsigned char *input = (image.data);
+        for (int i = 0; i < m_cloudSize; i++) {
             for (int j = 0; j < 16; j++) {
-                Point *point = &m_points[j][i];
+                Point *point = &m_points[i][j];
                 int x = static_cast<int>(point->getPos()[0] * 8) + 400;
                 int y = static_cast<int>(point->getPos()[1] * 8) + 400;
                 if ((x < 800) && (y < 800) && (y >= 0) && (x >= 0)) {

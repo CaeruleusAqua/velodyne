@@ -14,7 +14,7 @@ INCLUDE_DIRECTORIES(SYSTEM ${OPENDAVINCI_INCLUDE_DIRS})
 
 # add scanned files as libs
 add_library(${PROJECT_NAME}-utils STATIC src/Utils.cpp)
-add_library(${PROJECT_NAME}-pointcloud-clustering STATIC src/PointcloudClustering.cpp src/Point.cpp)
+add_library(${PROJECT_NAME}-pointcloud-clustering STATIC src/dbscan.cpp src/PointcloudClustering.cpp src/Point.cpp)
 
 
 # add od and scnanned libs to LIBRARIES
