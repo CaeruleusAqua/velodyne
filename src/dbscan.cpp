@@ -3,46 +3,39 @@
 #include "opendavinci/odcore/wrapper/half_float.h"
 #include <opencv2/core/core.hpp>
 #include <chrono>
-#include <algorithm>
+
 
 void DbScan::getClusters(std::vector<std::vector<Point *>> &clusters) {
-    for (int i = 0; i < m_cloudSize; i++) {
-        for (int j = 0; j < 16; j++) {
-            Point *point = &m_points[i][j];
-            if (!point->isVisited()) {
+    for (int angle = 0; angle < m_cloudSize; angle++) {
+        for (int index = 0; index < 16; index++) {
+            Point *point = &m_points[angle][index];
+            if (!point->isVisited() && !point->isClustered()) {
                 point->setVisited(true);
-                std::vector<Point *> collection = regionQuery(point);
-                if (collection.size() > m_minPts) {
-                    std::vector<Point *> cluster;
-                    cluster.push_back(point);
-                    point->clustered = true;
-                    expandCluster(collection, cluster);
-                    clusters.push_back(cluster);
+                auto neighbors = std::vector<Point *>();
+                regionQuery(neighbors, point);
+                if (neighbors.size() > m_minPts) {
+                    clusters.push_back(std::vector<Point *>());
+                    clusters.back().push_back(point);
+                    point->setClustered(true);
+                    expandCluster(neighbors, clusters.back());
                 }
-
             }
         }
     }
 }
 
 
-std::vector<Point *> DbScan::regionQuery(Point *point) {
-    int didx = 3;
-    std::vector<Point *> collection;
-    //float distance = point->getMeasurement();
-    int i = point->getI();
-    for (int k = std::max(0, i - didx); k < std::min(i + didx, (int) m_cloudSize); k++) {
+void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
+    int didx = 2;
+    int i = point->getIndex();
+    for (int k = std::max(0, i - didx); k < std::min(i + 1 + didx, (int) m_cloudSize); k++) {
         for (int l = 0; l < 16; l++) {
-            float z = point->getPos()[2];
-            if (0 > z && z > -2) {
-                if (point->get2Distance(m_points[k][l]) < m_eps) {
-                    collection.push_back(&m_points[k][l]);
-                }
+            if (point->get2Distance(m_points[k][l]) < m_eps) {
+                neighbors.push_back(&m_points[k][l]);
             }
-        }
 
+        }
     }
-    return collection;
 }
 
 
@@ -53,14 +46,15 @@ void DbScan::expandCluster(std::vector<Point *> &neighbors, std::vector<Point *>
 
         if (!point->isVisited()) {
             point->setVisited(true);
-            std::vector<Point *> collection = regionQuery(point);
+            auto collection = std::vector<Point *>();
+            regionQuery(collection, point);
             if (collection.size() > m_minPts) {
                 neighbors.insert(neighbors.end(), collection.begin(), collection.end());
             }
         }
-        if (!point->clustered) {
+        if (!point->isClustered()) {
             cluster.push_back(point);
-            point->clustered = true;
+            point->setClustered(true);
         }
     }
 }

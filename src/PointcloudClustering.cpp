@@ -28,7 +28,6 @@ void PointcloudClustering::tearDown() {
 
 
 void PointcloudClustering::transform(CompactPointCloud &cpc) {
-    max(2, 4);
     static const int maping[] = {-15, -13, -11, -9, -7, -5, -3, -1, 1, 3, 5, 7, 9, 11, 13, 15};
     std::string distances = cpc.getDistances();
     m_cloudSize = distances.size() / 2 / 16;
@@ -46,8 +45,8 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             m_points[i / 16][offset] = Point(x, y, z, measurement, azimuth);
             m_points[i / 16][offset].setIndex(i / 16, offset);
             if (measurement <= 1 || !(z < 10 && z > -2)) {
-                m_points[i / 16][offset].setVisited(true);
-                m_points[i / 16][offset].clustered = true;
+                //m_points[i / 16][offset].setVisited(true);
+                m_points[i / 16][offset].setClustered(true);
             }
         }
     }
@@ -56,13 +55,12 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
 
 void PointcloudClustering::nextContainer(Container &c) {
     if (c.getDataType() == CompactPointCloud::ID()) {
-
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
         CompactPointCloud cpc = c.getData<CompactPointCloud>();
 
         transform(cpc);
 
-        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
         DbScan dbScan = DbScan(m_points, m_cloudSize);
 
@@ -80,15 +78,15 @@ void PointcloudClustering::nextContainer(Container &c) {
         //for (uint32_t i = 0; i < clusters.size(); i++) {
         //    cout << clusters[i].size() << endl;
         //}
-        //cout << "--------------------------" << endl << endl;
+        cout << "--------------------------" << endl << endl;
 
         cv::Mat image(800, 800, CV_8UC3, cv::Scalar(0, 0, 0));
         unsigned char *input = (image.data);
         for (int i = 0; i < m_cloudSize; i++) {
             for (int j = 0; j < 16; j++) {
                 Point *point = &m_points[i][j];
-                int x = static_cast<int>(point->getPos()[0] * 8) + 400;
-                int y = static_cast<int>(point->getPos()[1] * 8) + 400;
+                int x = static_cast<int>(point->getX() * 8) + 400;
+                int y = static_cast<int>(point->getY() * 8) + 400;
                 if ((x < 800) && (y < 800) && (y >= 0) && (x >= 0)) {
                     // if (point->getMeasurement() > 1 && ( point->getPos()[3] <0  && point->getPos()[3] > -1)) {
                     image.at<cv::Vec3b>(y, x)[0] = 255;
@@ -104,8 +102,8 @@ void PointcloudClustering::nextContainer(Container &c) {
         int i = 0;
         for (auto cluster : clusters) {
             for (auto point : cluster) {
-                int x = static_cast<int>(point->getPos()[0] * 8) + 400;
-                int y = static_cast<int>(point->getPos()[1] * 8) + 400;
+                int x = static_cast<int>(point->getX() * 8) + 400;
+                int y = static_cast<int>(point->getY() * 8) + 400;
                 if ((x < 800) && (y < 800) && (y >= 0) && (x >= 0)) {
                     if (i % 3 == 0) {
                         image.at<cv::Vec3b>(y, x)[0] = 255;

@@ -4,41 +4,49 @@
 
 #include "Point.h"
 #include <cmath>
+#include <iostream>
 
 
 Point::Point(float x, float y, float z, float azimuth, float measurement) {
-    m_pos[0] = x;
-    m_pos[1] = y;
-    m_pos[2] = z;
+    m_x = x;
+    m_y = y;
+    m_z = z;
     m_azimuth = azimuth;
     m_measurement = measurement;
     m_visited = false;
     m_noise = false;
-    clustered = false;
+    m_clustered = false;
 }
-
 
 
 Point::Point() {
     m_visited = false;
     m_noise = false;
-    clustered = false;
+    m_clustered = false;
 }
 
 void Point::setX(float x) {
-    m_pos[0] = x;
+    m_x = x;
 }
 
 void Point::setY(float y) {
-    m_pos[1] = y;
+    m_y = y;
 }
 
 void Point::setZ(float z) {
-    m_pos[2] = z;
+    m_z = z;
 }
 
-float *Point::getPos() {
-    return m_pos;
+float Point::getX() {
+    return m_x;
+}
+
+float Point::getY() {
+    return m_y;
+}
+
+float Point::getZ() {
+    return m_z;
 }
 
 float Point::getAzimuth() {
@@ -50,8 +58,8 @@ float Point::getMeasurement() {
 }
 
 float Point::get2Distance(Point &a) {
-    float x = getPos()[0] - a.getPos()[0];
-    float y = getPos()[1] - a.getPos()[1];
+    float x = m_x - a.getX();
+    float y = m_y - a.getY();
     return std::sqrt(x * x + y * y);
 }
 
@@ -63,23 +71,32 @@ void Point::setVisited(bool vis) {
     m_visited = vis;
 }
 
+
+bool Point::isClustered() {
+    return m_clustered;
+}
+
+void Point::setClustered(bool clustered) {
+    m_clustered = clustered;
+}
+
 void Point::setIndex(int i, int j) {
     m_i = i;
     m_j = j;
 }
 
-int Point::getI() {
+int Point::getIndex() {
     return m_i;
 }
 
-int Point::getJ() {
+int Point::getLayer() {
     return m_j;
 }
 
 std::ostream &operator<<(std::ostream &strm, const Point &p) {
-    float x = p.m_pos[0];
-    float y = p.m_pos[1];
-    float z = p.m_pos[2];
+    float x = p.m_x;
+    float y = p.m_y;
+    float z = p.m_z;
 
     return strm << " X: " << x << " Y: " << y << " Z: " << z;
 }

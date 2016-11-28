@@ -4,7 +4,7 @@
 
 class Point {
 private:
-    float m_pos[3];
+    float m_x,m_y,m_z;
     float m_azimuth;
     float m_measurement;
     bool m_visited;
@@ -15,7 +15,7 @@ public:
     int m_i;
     int m_j;
     bool m_noise;
-    bool clustered;
+    bool m_clustered;
 
     Point(float x, float y, float z, float azimuth, float measurement);
 
@@ -29,7 +29,11 @@ public:
 
     void setZ(float z);
 
-    float *getPos();
+    float getX();
+
+    float getY();
+
+    float getZ();
 
     float getAzimuth();
 
@@ -43,6 +47,11 @@ public:
 
     void setVisited(bool vis);
 
-    int getI();
-    int getJ();
+    bool isClustered();
+
+    void setClustered(bool clustered);
+
+    int getIndex();
+
+    int getLayer();
 };
