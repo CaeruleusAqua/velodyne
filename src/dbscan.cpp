@@ -28,7 +28,33 @@ void DbScan::getClusters(std::vector<std::vector<Point *>> &clusters) {
 void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
     int didx = 2;
     int i = point->getIndex();
-    for (int k = std::max(0, i - didx); k < std::min(i + 1 + didx, (int) m_cloudSize); k++) {
+    int neg_idx = i - didx;
+    int pos_idx = i + 1 + didx - m_cloudSize;
+    // -2
+    if (neg_idx < 0) {
+        for (int k = neg_idx; k < 0; k++) {
+            for (int l = 0; l < 16; l++) {
+                if (point->get2Distance(m_points[m_cloudSize - k][l]) < m_eps) {
+                    neighbors.push_back(&m_points[m_cloudSize - k][l]);
+                }
+
+            }
+        }
+
+    }
+    if (pos_idx > 0) {
+        for (int k = 0; k < pos_idx; k++) {
+            for (int l = 0; l < 16; l++) {
+                if (point->get2Distance(m_points[k][l]) < m_eps) {
+                    neighbors.push_back(&m_points[k][l]);
+                }
+
+            }
+        }
+
+    }
+
+    for (int k = std::max(0, neg_idx); k < std::min(i + 1 + didx, (int) m_cloudSize); k++) {
         for (int l = 0; l < 16; l++) {
             if (point->get2Distance(m_points[k][l]) < m_eps) {
                 neighbors.push_back(&m_points[k][l]);
@@ -36,6 +62,7 @@ void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
 
         }
     }
+
 }
 
 

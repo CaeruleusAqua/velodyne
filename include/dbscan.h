@@ -24,7 +24,7 @@ private:
 
     Point (&m_points)[2000][16];
     unsigned int m_cloudSize;
-    static constexpr float m_eps = 1.8;
+    static constexpr float m_eps = 0.8;
     static constexpr uint32_t m_minPts = 10;
 };
 

@@ -4,7 +4,7 @@
 
 class Point {
 private:
-    float m_x,m_y,m_z;
+    float m_x, m_y, m_z;
     float m_azimuth;
     float m_measurement;
     bool m_visited;
@@ -21,19 +21,17 @@ public:
 
     Point();
 
-    friend std::ostream &operator<<(std::ostream &outputStream, const Point &p);
-
     void setX(float x);
 
     void setY(float y);
 
     void setZ(float z);
 
-    float getX();
+    const float getX() const;
 
-    float getY();
+    const float getY() const;
 
-    float getZ();
+    const float getZ() const;
 
     float getAzimuth();
 
@@ -54,4 +52,12 @@ public:
     int getIndex();
 
     int getLayer();
+
+    bool operator<(const Point &p) const {
+        return (m_x < p.getX() || (m_x == p.getX() && m_y < p.getY()));
+    }
+
+    std::ostream &operator<<(std::ostream &strm) {
+        return strm << " X: " << m_x << " Y: " << m_y << " Z: " << m_z;
+    }
 };

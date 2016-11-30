@@ -1,16 +1,7 @@
 #include "Utils.h"
+
 namespace utils {
 
-    /**
-    * This is a versatile function to create lists containing arithmetic progressions.
-    * It is most often used in for loops
-    *
-    * @param start The starting value of the sequence.
-    * @param stop The end value of the sequence, unless endpoint is set to False. In that case, the sequence
-    * consists of all but the last of num + 1 evenly spaced samples, so that stop is excluded.
-    * @param step Stepsize used to generate the samples. Default is 1. Can also be negative.
-    * @param endpoint If True, stop is the last sample. Otherwise, it is not included. Default is False.
-    */
     std::vector<double> range(double start, double stop, double step, bool endpoint) {
         if (start > stop && step > 0) {
             step = -step;
@@ -18,9 +9,9 @@ namespace utils {
         std::vector<double> array;
         uint64_t num = 0;
         if (endpoint) {
-            num = abs((stop - start) / step) + 1;
+            num = std::abs((stop - start) / step) + 1;
         } else {
-            num = abs((stop - start - step) / step) + 1;
+            num = std::abs((stop - start - step) / step) + 1;
         }
         std::cout << "Num: " << num << std::endl;
 
@@ -39,16 +30,6 @@ namespace utils {
         return array;
     }
 
-    /**
-    * Return evenly spaced numbers over a specified interval.
-    *
-    * @param start The starting value of the sequence.
-    * @param stop The end value of the sequence, unless endpoint is set to False. In that case, the sequence
-    * consists of all but the last of num + 1 evenly spaced samples, so that stop is excluded.
-    * Note that the step size changes when endpoint is False.
-    * @param num Number of samples to generate. Default is 50. Must be non-negative.
-    * @param endpoint If True, stop is the last sample. Otherwise, it is not included. Default is True.
-    */
     std::vector<double> linspace(double start, double stop, uint64_t num, bool endpoint) {
         std::vector<double> array;
         double step = 0;
@@ -82,6 +63,40 @@ namespace utils {
         }
         return array;
     }
+
+    // 2D cross product of OA and OB vectors, i.e. z-component of their 3D cross product.
+    // Returns a positive value, if OAB makes a counter-clockwise turn,
+    // negative for clockwise turn, and zero if the points are collinear.
+    double cross(const Point *O, const Point *A, const Point *B) {
+        return (A->getX() - O->getX()) * (B->getY() - O->getY()) - (A->getY() - O->getY()) * (B->getX() - O->getX());
+    }
+
+    // Returns a list of points on the convex hull in counter-clockwise order.
+// Note: the last point in the returned list is the same as the first one.
+    std::vector<Point*> convex_hull(std::vector<Point *> P) {
+        int n = P.size(), k = 0;
+        std::vector<Point *> H(2 * n);
+
+        // Sort points lexicographically
+        std::sort(P.begin(), P.end(),less_than_key());
+
+        // Build lower hull
+        for (int i = 0; i < n; ++i) {
+            while (k >= 2 && cross(H[k - 2], H[k - 1], P[i]) <= 0) k--;
+            H[k++] = P[i];
+        }
+
+        // Build upper hull
+        for (int i = n - 2, t = k + 1; i >= 0; i--) {
+            while (k >= t && cross(H[k - 2], H[k - 1], P[i]) <= 0) k--;
+            H[k++] = P[i];
+        }
+
+        H.resize(k - 1);
+        return H;
+    }
+
+
 }
 
 

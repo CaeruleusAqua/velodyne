@@ -1,5 +1,6 @@
 #include "PointcloudClustering.h"
 #include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
 #include <chrono>
@@ -45,7 +46,12 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             m_points[i / 16][offset] = Point(x, y, z, measurement, azimuth);
             m_points[i / 16][offset].setIndex(i / 16, offset);
             if (measurement <= 1 || !(z < 10 && z > -2)) {
-                //m_points[i / 16][offset].setVisited(true);
+                m_points[i / 16][offset].setVisited(true);
+
+
+                //// not jet correctly fixed.. ground should not connect clusters...
+
+
                 m_points[i / 16][offset].setClustered(true);
             }
         }
@@ -66,6 +72,11 @@ void PointcloudClustering::nextContainer(Container &c) {
 
         std::vector<std::vector<Point *>> clusters;
         dbScan.getClusters(clusters);
+
+        for (auto cluster : clusters) {
+            utils::convex_hull(cluster);
+        }
+
 
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
@@ -124,6 +135,29 @@ void PointcloudClustering::nextContainer(Container &c) {
                 }
             }
             i++;
+        }
+
+        for (auto &cluster : clusters) {
+            auto hull = utils::convex_hull(cluster);
+            std::vector<cv::Point2f> vec;
+            for(auto &point : hull){
+                vec.push_back(cv::Point2f(point->getX()*8+400,point->getY()*8+400));
+            }
+            if(vec.size() > 2) {
+                auto rect = cv::minAreaRect(vec);
+                cv::Point2f rec[4];
+                rect.points(rec);
+                //cv::rectangle(image, rect, cv::Scalar(255, 0, 255), 1, 8, 0 );
+                for (int j = 0; j < 4; j++)
+                    cv::line(image, rec[j], rec[(j + 1) % 4], cv::Scalar(255, 0, 255), 1, 8);
+            }
+            for (int i = 1; i < hull.size(); i++) {
+                cv::line(image, cv::Point(hull[i - 1]->getX() * 8 + 400, hull[i - 1]->getY() * 8 + 400), cv::Point(hull[i]->getX() * 8 + 400, hull[i]->getY() * 8 + 400),
+                         cv::Scalar(255, 255, 0), 1, 8, 0);
+            }
+            if (hull.size() > 1)
+                cv::line(image, cv::Point(hull[hull.size() - 1]->getX() * 8 + 400, hull[hull.size() - 1]->getY() * 8 + 400),
+                         cv::Point(hull[0]->getX() * 8 + 400, hull[0]->getY() * 8 + 400), cv::Scalar(255, 255, 0), 1, 8, 0);
         }
 
 

@@ -3,7 +3,13 @@
 #include <cstdint>
 #include <cmath>
 #include <cstdlib>
+#include "Point.h"
 #include <iostream>
+#include <vector>
+#include <algorithm>
+
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 namespace utils {
 
 
@@ -35,6 +41,20 @@ namespace utils {
         static const double pi_on_180 = M_PI / 180.0L;
         return degrees * pi_on_180;
     }
+
+
+    double cross(const Point *O, const Point *A, const Point *B);
+
+    struct less_than_key
+    {
+        inline bool operator() (const Point *struct1, const Point *struct2)
+        {
+
+            return (struct1->getX() < struct2->getX() || (struct1->getX() == struct2->getX() && struct1->getY() < struct2->getY()));
+        }
+    };
+
+    std::vector<Point*> convex_hull(std::vector<Point *> P);
 }
 
 

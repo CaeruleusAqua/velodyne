@@ -37,15 +37,15 @@ void Point::setZ(float z) {
     m_z = z;
 }
 
-float Point::getX() {
+const float Point::getX() const{
     return m_x;
 }
 
-float Point::getY() {
+const float Point::getY() const{
     return m_y;
 }
 
-float Point::getZ() {
+const float Point::getZ() const{
     return m_z;
 }
 
@@ -91,13 +91,5 @@ int Point::getIndex() {
 
 int Point::getLayer() {
     return m_j;
-}
-
-std::ostream &operator<<(std::ostream &strm, const Point &p) {
-    float x = p.m_x;
-    float y = p.m_y;
-    float z = p.m_z;
-
-    return strm << " X: " << x << " Y: " << y << " Z: " << z;
 }
 
