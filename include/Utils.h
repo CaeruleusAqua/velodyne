@@ -7,6 +7,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include "Cluster.h"
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -54,7 +55,7 @@ namespace utils {
         }
     };
 
-    std::vector<Point*> convex_hull(std::vector<Point *> P);
+    std::vector<Point*> convex_hull(Cluster P);
 }
 
 

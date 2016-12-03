@@ -5,7 +5,7 @@
 #include <chrono>
 
 
-void DbScan::getClusters(std::vector<std::vector<Point *>> &clusters) {
+void DbScan::getClusters(std::vector<Cluster> &clusters) {
     for (int angle = 0; angle < m_cloudSize; angle++) {
         for (int index = 0; index < 16; index++) {
             Point *point = &m_points[angle][index];
@@ -14,8 +14,8 @@ void DbScan::getClusters(std::vector<std::vector<Point *>> &clusters) {
                 auto neighbors = std::vector<Point *>();
                 regionQuery(neighbors, point);
                 if (neighbors.size() > m_minPts) {
-                    clusters.push_back(std::vector<Point *>());
-                    clusters.back().push_back(point);
+                    clusters.push_back(Cluster());
+                    clusters.back().m_cluster.push_back(point);
                     point->setClustered(true);
                     expandCluster(neighbors, clusters.back());
                 }
@@ -30,28 +30,24 @@ void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
     int i = point->getIndex();
     int neg_idx = i - didx;
     int pos_idx = i + 1 + didx - m_cloudSize;
-    // -2
-    if (neg_idx < 0) {
-        for (int k = neg_idx; k < 0; k++) {
-            for (int l = 0; l < 16; l++) {
-                if (point->get2Distance(m_points[m_cloudSize - k][l]) < m_eps) {
-                    neighbors.push_back(&m_points[m_cloudSize - k][l]);
-                }
 
+
+    for (int k = m_cloudSize + neg_idx; k < m_cloudSize; k++) {
+        for (int l = 0; l < 16; l++) {
+            if (point->get2Distance(m_points[k][l]) < m_eps) {
+                neighbors.push_back(&m_points[k][l]);
             }
-        }
 
+        }
     }
-    if (pos_idx > 0) {
-        for (int k = 0; k < pos_idx; k++) {
-            for (int l = 0; l < 16; l++) {
-                if (point->get2Distance(m_points[k][l]) < m_eps) {
-                    neighbors.push_back(&m_points[k][l]);
-                }
 
+    for (int k = 0; k < pos_idx; k++) {
+        for (int l = 0; l < 16; l++) {
+            if (point->get2Distance(m_points[k][l]) < m_eps) {
+                neighbors.push_back(&m_points[k][l]);
             }
-        }
 
+        }
     }
 
     for (int k = std::max(0, neg_idx); k < std::min(i + 1 + didx, (int) m_cloudSize); k++) {
@@ -66,7 +62,7 @@ void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
 }
 
 
-void DbScan::expandCluster(std::vector<Point *> &neighbors, std::vector<Point *> &cluster) {
+void DbScan::expandCluster(std::vector<Point *> &neighbors, Cluster &cluster) {
     while (!neighbors.empty()) {
         Point *point = neighbors.back();
         neighbors.pop_back();
@@ -80,7 +76,7 @@ void DbScan::expandCluster(std::vector<Point *> &neighbors, std::vector<Point *>
             }
         }
         if (!point->isClustered()) {
-            cluster.push_back(point);
+            cluster.m_cluster.push_back(point);
             point->setClustered(true);
         }
     }

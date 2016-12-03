@@ -8,6 +8,7 @@
 #include <iostream>
 #include <array>
 #include "dbscan.h"
+#include "Cluster.h"
 
 class PointcloudClustering : public odcore::base::module::DataTriggeredConferenceClientModule {
 private:
@@ -52,9 +53,13 @@ private:
 
     Point m_points[2000][16];
     unsigned int m_cloudSize;
+    std::vector<Cluster> m_old_clusters;
+
+
 
 
     static constexpr float m_eps = 1000;
     static constexpr uint32_t m_minPts = 20;
+    unsigned int m_id_counter = 0;
 
 };

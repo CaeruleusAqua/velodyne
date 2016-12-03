@@ -5,6 +5,7 @@
 #include <iostream>
 #include <chrono>
 #include "dbscan.h"
+#include "Cluster.h"
 
 
 using namespace std;
@@ -45,7 +46,7 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             float z = measurement * sin(static_cast<float>(utils::deg2rad(maping[offset])));
             m_points[i / 16][offset] = Point(x, y, z, measurement, azimuth);
             m_points[i / 16][offset].setIndex(i / 16, offset);
-            if (measurement <= 1 || !(z < 10 && z > -2)) {
+            if (measurement <= 1 || !(z < 10 && z > -1.5)) {
                 m_points[i / 16][offset].setVisited(true);
 
 
@@ -56,6 +57,10 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             }
         }
     }
+
+
+
+
 }
 
 
@@ -70,11 +75,37 @@ void PointcloudClustering::nextContainer(Container &c) {
 
         DbScan dbScan = DbScan(m_points, m_cloudSize);
 
-        std::vector<std::vector<Point *>> clusters;
+        std::vector<Cluster> clusters;
         dbScan.getClusters(clusters);
+        for (auto &cluster : clusters) {
+            cluster.m_id = m_id_counter++;
+            cluster.mean();
+        }
 
-        for (auto cluster : clusters) {
-            utils::convex_hull(cluster);
+
+        if (m_old_clusters.size() == 0) {
+            m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
+        } else {
+            cout << "Searching:" << endl;
+            for (auto &new_cluster : clusters) {
+                double min_dist = 10000;
+                Cluster *next = nullptr;
+                for (auto &old_cluster : m_old_clusters) {
+                    if (!old_cluster.matched) {
+                        double dist = new_cluster.get2Distance(old_cluster);
+                        if (dist < min_dist) {
+                            next = &old_cluster;
+                            min_dist = dist;
+                        }
+                    }
+                }
+                if (next != nullptr && min_dist < 3) {
+                    new_cluster.m_id = next->m_id;
+                    next->matched = false;
+                }
+            }
+            m_old_clusters.clear();
+            m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
         }
 
 
@@ -85,19 +116,20 @@ void PointcloudClustering::nextContainer(Container &c) {
         millis += std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1000000.0;
 
         std::cout << "Time difference = " << millis << std::endl;
-        //cout << "Clusters Num: " << clusters.size() << endl;
-        //for (uint32_t i = 0; i < clusters.size(); i++) {
-        //    cout << clusters[i].size() << endl;
-        //}
-        cout << "--------------------------" << endl << endl;
+        //cout << "--------------------------" << endl << endl;
 
-        cv::Mat image(800, 800, CV_8UC3, cv::Scalar(0, 0, 0));
-        unsigned char *input = (image.data);
+        const static int res = 800;
+        const static int zoom = 8;
+
+
+
+
+        cv::Mat image(res, res, CV_8UC3, cv::Scalar(0, 0, 0));
         for (int i = 0; i < m_cloudSize; i++) {
             for (int j = 0; j < 16; j++) {
                 Point *point = &m_points[i][j];
-                int x = static_cast<int>(point->getX() * 8) + 400;
-                int y = static_cast<int>(point->getY() * 8) + 400;
+                int x = static_cast<int>(point->getX() * zoom) + res / 2;
+                int y = static_cast<int>(point->getY() * zoom) + res / 2;
                 if ((x < 800) && (y < 800) && (y >= 0) && (x >= 0)) {
                     // if (point->getMeasurement() > 1 && ( point->getPos()[3] <0  && point->getPos()[3] > -1)) {
                     image.at<cv::Vec3b>(y, x)[0] = 255;
@@ -110,23 +142,23 @@ void PointcloudClustering::nextContainer(Container &c) {
             }
         }
 
-        int i = 0;
-        for (auto cluster : clusters) {
-            for (auto point : cluster) {
-                int x = static_cast<int>(point->getX() * 8) + 400;
-                int y = static_cast<int>(point->getY() * 8) + 400;
-                if ((x < 800) && (y < 800) && (y >= 0) && (x >= 0)) {
-                    if (i % 3 == 0) {
+
+        for (auto &cluster : clusters) {
+            for (auto point : (cluster.m_cluster)) {
+                int x = static_cast<int>(point->getX() * zoom) + res / 2;
+                int y = static_cast<int>(point->getY() * zoom) + res / 2;
+                if ((x < res) && (y < res) && (y >= 0) && (x >= 0)) {
+                    if (cluster.m_id % 3 == 0) {
                         image.at<cv::Vec3b>(y, x)[0] = 255;
                         image.at<cv::Vec3b>(y, x)[1] = 0;
                         image.at<cv::Vec3b>(y, x)[2] = 0;
                     }
-                    if (i % 3 == 1) {
+                    if (cluster.m_id % 3 == 1) {
                         image.at<cv::Vec3b>(y, x)[0] = 0;
                         image.at<cv::Vec3b>(y, x)[1] = 255;
                         image.at<cv::Vec3b>(y, x)[2] = 0;
                     }
-                    if (i % 3 == 2) {
+                    if (cluster.m_id % 3 == 2) {
                         image.at<cv::Vec3b>(y, x)[0] = 0;
                         image.at<cv::Vec3b>(y, x)[1] = 0;
                         image.at<cv::Vec3b>(y, x)[2] = 255;
@@ -134,31 +166,27 @@ void PointcloudClustering::nextContainer(Container &c) {
 
                 }
             }
-            i++;
         }
 
         for (auto &cluster : clusters) {
             auto hull = utils::convex_hull(cluster);
-            std::vector<cv::Point2f> vec;
-            for(auto &point : hull){
-                vec.push_back(cv::Point2f(point->getX()*8+400,point->getY()*8+400));
-            }
-            if(vec.size() > 2) {
-                auto rect = cv::minAreaRect(vec);
-                cv::Point2f rec[4];
-                rect.points(rec);
-                //cv::rectangle(image, rect, cv::Scalar(255, 0, 255), 1, 8, 0 );
-                for (int j = 0; j < 4; j++)
-                    cv::line(image, rec[j], rec[(j + 1) % 4], cv::Scalar(255, 0, 255), 1, 8);
-            }
+            std::stringstream ss;
+            ss << cluster.m_id;
+
+            cv::putText(image, ss.str(), cv::Point(cluster.m_center[0] * zoom + res / 2, cluster.m_center[1] * zoom + res / 2), cv::FONT_HERSHEY_SIMPLEX, 0.33,
+                        cv::Scalar(255, 255, 255));
             for (int i = 1; i < hull.size(); i++) {
-                cv::line(image, cv::Point(hull[i - 1]->getX() * 8 + 400, hull[i - 1]->getY() * 8 + 400), cv::Point(hull[i]->getX() * 8 + 400, hull[i]->getY() * 8 + 400),
+                cv::line(image, cv::Point(hull[i - 1]->getX() * zoom + res / 2, hull[i - 1]->getY() * zoom + res / 2),
+                         cv::Point(hull[i]->getX() * zoom + res / 2, hull[i]->getY() * zoom + res / 2),
                          cv::Scalar(255, 255, 0), 1, 8, 0);
             }
             if (hull.size() > 1)
-                cv::line(image, cv::Point(hull[hull.size() - 1]->getX() * 8 + 400, hull[hull.size() - 1]->getY() * 8 + 400),
-                         cv::Point(hull[0]->getX() * 8 + 400, hull[0]->getY() * 8 + 400), cv::Scalar(255, 255, 0), 1, 8, 0);
+                cv::line(image, cv::Point(hull[hull.size() - 1]->getX() * zoom + res / 2, hull[hull.size() - 1]->getY() * zoom + res / 2),
+                         cv::Point(hull[0]->getX() * zoom + res / 2, hull[0]->getY() * zoom + res / 2), cv::Scalar(255, 255, 0), 1, 8, 0);
         }
+
+
+        cv::line(image, cv::Point(res-20 -zoom ,res-20), cv::Point(res-20,res-20), cv::Scalar(255, 255, 0), 1);
 
 
         cv::imshow("Display Image", image);
