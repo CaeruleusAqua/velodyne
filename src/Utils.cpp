@@ -1,7 +1,9 @@
 #include "Utils.h"
 #include "Cluster.h"
+#include "Point.h"
 
 namespace utils {
+
 
     std::vector<double> range(double start, double stop, double step, bool endpoint) {
         if (start > stop && step > 0) {
@@ -28,6 +30,40 @@ namespace utils {
                 start += step;
             }
         }
+        return array;
+    }
+
+    uint32_t getMaxIndex(std::vector<Point *> array) {
+        float maxz = array[0]->getZ();
+        uint32_t max_index = 0;
+        for (int i = 1; i < array.size(); i++) {
+            if (array[i]->getZ() > maxz) {
+                maxz = array[i]->getZ();
+                max_index = i;
+            }
+        }
+        return max_index;
+    }
+
+    std::vector<Point *> minZinSec(int start, int stop, Point (&points)[2000][16]) {
+        static const uint32_t num_of_minima = 14;
+        std::vector<Point *> array;
+
+        for (int i = start; i < start+num_of_minima; i++) {
+            array.push_back(&(points[0][14]));    // this could be wrong...
+        }
+
+
+        uint32_t endOffset = 7; // assume only negative angles for minimal z values
+        for (int i = start; i < stop; i++) {
+            for (int offset = 0; offset < endOffset; offset++) {
+                int maxIdx = getMaxIndex(array);
+                if (points[i][offset].getZ() < array[maxIdx]->getZ()) {
+                    array[maxIdx] = &(points[i][offset]);
+                }
+            }
+        }
+
         return array;
     }
 
@@ -73,7 +109,7 @@ namespace utils {
     }
 
     // Returns a list of points on the convex hull in counter-clockwise order.
-// Note: the last point in the returned list is the same as the first one.
+    // Note: the last point in the returned list is the same as the first one.
     std::vector<Point *> convex_hull(Cluster P) {
         int n = P.m_cluster.size(), k = 0;
         std::vector<Point *> H(2 * n);

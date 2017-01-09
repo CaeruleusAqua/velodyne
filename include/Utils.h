@@ -55,6 +55,11 @@ namespace utils {
         }
     };
 
+
+    std::vector<Point *> minZinSec(int start, int stop, Point (&points)[2000][16]);
+
+
+
     std::vector<Point*> convex_hull(Cluster P);
 }
 

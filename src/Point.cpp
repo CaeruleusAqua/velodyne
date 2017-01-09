@@ -5,6 +5,7 @@
 #include "Point.h"
 #include <cmath>
 #include <iostream>
+#include <eigen3/Eigen/Dense>
 
 
 Point::Point(float x, float y, float z, float azimuth, float measurement) {
@@ -23,6 +24,10 @@ Point::Point() {
     m_visited = false;
     m_noise = false;
     m_clustered = false;
+}
+
+Eigen::Vector3f Point::getVec(){
+    return Eigen::Vector3f(m_x,m_y,m_z);
 }
 
 void Point::setX(float x) {

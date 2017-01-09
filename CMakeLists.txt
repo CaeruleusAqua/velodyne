@@ -8,13 +8,23 @@ SET(CMAKE_MODULE_PATH "${OPENDAVINCI_DIR}/share/cmake-${CMAKE_MAJOR_VERSION}.${C
 
 FIND_PACKAGE(OpenDaVINCI REQUIRED)
 FIND_PACKAGE(OpenCV REQUIRED)
+FIND_PACKAGE( Eigen3 REQUIRED )
+INCLUDE_DIRECTORIES( EIGEN3_INCLUDE_DIR )
+
+IF( NOT EIGEN3_INCLUDE_DIR )
+    MESSAGE( FATAL_ERROR "Please point the environment variable EIGEN3_INCLUDE_DIR to the include directory of your Eigen3 installation.")
+ENDIF()
+
+
 INCLUDE_DIRECTORIES(include)
 INCLUDE_DIRECTORIES(SYSTEM ${OPENDAVINCI_INCLUDE_DIRS})
 
 
+
+
 # add scanned files as libs
 add_library(${PROJECT_NAME}-utils STATIC src/Utils.cpp)
-add_library(${PROJECT_NAME}-pointcloud-clustering STATIC src/dbscan.cpp src/Cluster.cpp src/PointcloudClustering.cpp src/Point.cpp)
+add_library(${PROJECT_NAME}-pointcloud-clustering STATIC src/dbscan.cpp src/Cluster.cpp src/PointcloudClustering.cpp src/Point.cpp src/Plane.cpp)
 
 
 # add od and scnanned libs to LIBRARIES

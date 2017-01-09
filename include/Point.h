@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <eigen3/Eigen/Dense>
 
 class Point {
 private:
@@ -33,6 +34,8 @@ public:
 
     const float getZ() const;
 
+    Eigen::Vector3f getVec();
+
     float getAzimuth();
 
     float getMeasurement();
@@ -57,7 +60,8 @@ public:
         return (m_x < p.getX() || (m_x == p.getX() && m_y < p.getY()));
     }
 
-    std::ostream &operator<<(std::ostream &strm) {
-        return strm << " X: " << m_x << " Y: " << m_y << " Z: " << m_z;
+    friend std::ostream &operator<<(std::ostream &strm, Point const & point) {
+        return strm << " X: " << point.m_x << " Y: " << point.m_y << " Z: " << point.m_z;
     }
+
 };
