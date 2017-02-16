@@ -72,7 +72,10 @@ float Point::getMeasurement() {
 float Point::get2Distance(Point &a) {
     float x = m_point[0] - a.getX();
     float y = m_point[1] - a.getY();
+
     return std::sqrt(x * x + y * y);
+
+   // return (m_point-a.getVec()).norm();
 }
 
 bool Point::isVisited() {

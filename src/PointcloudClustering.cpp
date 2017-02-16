@@ -80,48 +80,21 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             float x = xy_range * sin(azimuth);
             float y = xy_range * cos(azimuth);
             float z = measurement * sin(static_cast<float>(utils::deg2rad(maping[offset])));
-
-//            if(offset){
-//                cout<<"Offset: "<<offset<<":"<<z<<":"<<xy_range<<endl;
-//            }
             m_points[i / 16][offset] = Point(x, y, z, measurement, azimuth);
             m_points[i / 16][offset].setIndex(i / 16, offset);
-//            if (measurement <= 2 || z < -1.8) {//|| z < 10 ) {
-//                m_points[i / 16][offset].setVisited(true);
-//
-//
-//                //// not jet correctly fixed.. ground should not connect clusters...
-//
-//
-//
-//                // ebenne in sektoren einteilen
-//                // mehrere minima in den sektoren finden...
-//                // ebenne aus minima berechnen (evtl RANSAC)
-//
-//
-//                m_points[i / 16][offset].setClustered(true);
-//            }
+
         }
     }
 
     //ground detection
     // Future: may applay only in front and rear area
 
-    //devide in 10 sections
+    //devide in sections
     unsigned int sector_size = m_cloudSize / 8;
     std::vector<Point *> minis;
     for (int sec = 0; sec < 8; sec += 1) {
         std::vector<Point *> tmp = utils::minZinSec(sector_size * sec, sector_size * (sec + 1), m_points);
-        //for (Point *mini:tmp) {
-        //    cout << *mini << endl;
-        //}
-        //cout << "----" << endl;
         minis.insert(minis.end(), tmp.begin(), tmp.end());
-
-//        for(int i=0; i<3;i++){
-//            cout<<"Z: "<<tmp[i]->getZ()<<endl;
-//            cout<<"L: "<<tmp[i]->getLayer()<<endl;
-//        }
     }
 //    std::vector<Point *> tmp = utils::minZinSec(sector_size * 0, sector_size * (0 + 1), m_points);
 //    minis.insert(minis.end(), tmp.begin(), tmp.end());
@@ -137,15 +110,15 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, ((minis.size() - 1)/3));
+    std::uniform_int_distribution<> dis(0, ((minis.size() - 1) / 3));
 
     for (int probes = 0; probes < 50; probes++) {
         std::vector<Point *> maybeinliers;
         std::vector<Point *> alsoinliers;
         // select 3 random points
-     maybeinliers.push_back(minis[dis(gen)]);
-       maybeinliers.push_back(minis[dis(gen)]);
-       maybeinliers.push_back(minis[dis(gen)]);
+        maybeinliers.push_back(minis[dis(gen)]);
+        maybeinliers.push_back(minis[dis(gen)]);
+        maybeinliers.push_back(minis[dis(gen)]);
 
         int offset = dis(gen);
 //        maybeinliers.push_back(minis[offset]);
@@ -178,12 +151,12 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
 
     for (uint32_t i = 0; i < m_cloudSize; i += 1) {
         for (uint32_t offset = 0; offset < 16; offset++) {
-            Eigen::Vector3f point=m_points[i][offset].getVec();
+            Eigen::Vector3f point = m_points[i][offset].getVec();
             if (m_bestGroundModel.getDist(point) > -0.3) {  //measurement <= 2 ||
                 //cout<<"Delete"<<endl;
-                m_points[i / 16][offset].setVisited(true);
-                m_points[i / 16][offset].setClustered(true);
-                m_points[i / 16][offset].setIsGround(true);
+                m_points[i][offset].setVisited(true);
+                m_points[i][offset].setClustered(true);
+                m_points[i][offset].setIsGround(true);
             }
         }
     }
