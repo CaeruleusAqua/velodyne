@@ -6,7 +6,7 @@
 
 
 void DbScan::getClusters(std::vector<Cluster> &clusters) {
-    for (int angle = 0; angle < m_cloudSize; angle++) {
+    for (uint32_t angle = 0; angle < m_cloudSize; angle++) {
         for (int index = 0; index < 16; index++) {
             Point *point = &m_points[angle][index];
             if (!point->isVisited() && !point->isClustered()) {
@@ -32,7 +32,7 @@ void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
     int pos_idx = i + 1 + didx - m_cloudSize;
 
 
-    for (int k = m_cloudSize + neg_idx; k < m_cloudSize; k++) {
+    for (uint32_t k = m_cloudSize + neg_idx; k < m_cloudSize; k++) {
         for (int l = 0; l < 16; l++) {
             if (point->get2Distance(m_points[k][l]) < m_eps) {
                 neighbors.push_back(&m_points[k][l]);

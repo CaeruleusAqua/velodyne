@@ -36,7 +36,7 @@ namespace utils {
     uint32_t getMaxIndex(std::vector<Point *> array) {
         float maxz = array[0]->getZ();
         uint32_t max_index = 0;
-        for (int i = 1; i < array.size(); i++) {
+        for (uint32_t i = 1; i < array.size(); i++) {
             if (array[i]->getZ() > maxz) {
                 maxz = array[i]->getZ();
                 max_index = i;
@@ -49,14 +49,14 @@ namespace utils {
         static const uint32_t num_of_minima = 14;
         std::vector<Point *> array;
 
-        for (int i = start; i < start+num_of_minima; i++) {
+        for (uint32_t i = start; i < start+num_of_minima; i++) {
             array.push_back(&(points[0][14]));    // this could be wrong...
         }
 
 
-        uint32_t endOffset = 7; // assume only negative angles for minimal z values
+        uint32_t endOffset = 3; // assume only negative angles for minimal z values
         for (int i = start; i < stop; i++) {
-            for (int offset = 0; offset < endOffset; offset++) {
+            for (uint32_t offset = 0; offset < endOffset; offset++) {
                 int maxIdx = getMaxIndex(array);
                 if (points[i][offset].getZ() < array[maxIdx]->getZ()) {
                     array[maxIdx] = &(points[i][offset]);

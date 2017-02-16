@@ -1,21 +1,37 @@
 #include "PointcloudClustering.h"
-#include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <iostream>
 #include <chrono>
-#include "dbscan.h"
-#include "Cluster.h"
-#include <cstdlib>
 #include <random>
-#include <eigen3/Eigen/Dense>
-#include "Plane.h"
+#include "opendlv/scenario/SCNXArchive.h"
+#include "opendlv/scenario/SCNXArchiveFactory.h"
+#include "opendlv/scenario/ScenarioFactory.h"
+#include "opendlv/core/wrapper/graph/DirectedGraph.h"
+#include "opendlv/core/wrapper/graph/Edge.h"
+#include "opendlv/core/wrapper/graph/Vertex.h"
+#include "opendlv/data/environment/EgoState.h"
+#include "opendlv/data/environment/Polygon.h"
+#include "opendlv/data/environment/Obstacle.h"
+#include "opendlv/data/graph/WaypointsEdge.h"
+#include "opendlv/data/graph/WaypointVertex.h"
+#include "opendlv/data/planning/Route.h"
+
+#include "opendlv/scenario/LaneVisitor.h"
+
+#include <opendlv/data/environment/WGS84Coordinate.h>
+
+#include "odvdapplanix/GeneratedHeaders_ODVDApplanix.h"
 
 using namespace std;
 
 // We add some of OpenDaVINCI's namespaces for the sake of readability.
 using namespace odcore::base::module;
 using namespace odcore::data;
+using namespace odcore::base;
+using namespace odcore::data;
+using namespace odcore::data;
+using namespace automotive;
+using namespace automotive::miniature;
+using namespace opendlv::data::environment;
 
 PointcloudClustering::PointcloudClustering(const int32_t &argc, char **argv) :
         DataTriggeredConferenceClientModule(argc, argv, "PointcloudClustering") {};
@@ -24,7 +40,22 @@ PointcloudClustering::~PointcloudClustering() {}
 
 void PointcloudClustering::setUp() {
     cout << "This method is called before the component's body is executed." << endl;
-    cv::namedWindow("Display Image", cv::WINDOW_AUTOSIZE);
+    cv::namedWindow("Lidar", cv::WINDOW_AUTOSIZE);
+    const odcore::io::URL urlOfSCNXFile(getKeyValueConfiguration().getValue<string>("global.scenario"));
+    core::wrapper::graph::DirectedGraph m_graph;
+    opendlv::scenario::SCNXArchive &scnxArchive = opendlv::scenario::SCNXArchiveFactory::getInstance().getSCNXArchive(
+            urlOfSCNXFile);
+
+    m_scenario = &scnxArchive.getScenario();
+
+    // Construct road network.
+    opendlv::scenario::LaneVisitor lv(m_graph, *m_scenario);
+    m_scenario->accept(lv);
+
+    opendlv::data::scenario::Vertex3 origin = m_scenario->getHeader().getWGS84CoordinateSystem().getOrigin();
+
+    cout << "Origin: " << origin;
+    m_origin = new opendlv::data::environment::WGS84Coordinate(origin.getX(), origin.getY());
 
 }
 
@@ -33,14 +64,12 @@ void PointcloudClustering::tearDown() {
 }
 
 
-
-
-
 void PointcloudClustering::transform(CompactPointCloud &cpc) {
     static const int maping[] = {-15, -13, -11, -9, -7, -5, -3, -1, 1, 3, 5, 7, 9, 11, 13, 15};
     std::string distances = cpc.getDistances();
     m_cloudSize = distances.size() / 2 / 16;
-    vector<double> azimuth_range = utils::linspace(utils::deg2rad(cpc.getStartAzimuth()), utils::deg2rad(cpc.getEndAzimuth()), m_cloudSize);
+    vector<double> azimuth_range = utils::linspace(utils::deg2rad(-cpc.getStartAzimuth() - m_heading + 180),
+                                                   utils::deg2rad(-cpc.getEndAzimuth() - m_heading + 180), m_cloudSize);
     const uint16_t *data = reinterpret_cast<const uint16_t *>(distances.c_str());
 
     for (uint32_t i = 0; i < distances.size() / 2; i += 16) {
@@ -52,38 +81,41 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             float y = xy_range * cos(azimuth);
             float z = measurement * sin(static_cast<float>(utils::deg2rad(maping[offset])));
 
-            if (z < -10) {
-                std::cout << "error!!!!!!!!!!!!!" << std::endl;
-            }
+//            if(offset){
+//                cout<<"Offset: "<<offset<<":"<<z<<":"<<xy_range<<endl;
+//            }
             m_points[i / 16][offset] = Point(x, y, z, measurement, azimuth);
             m_points[i / 16][offset].setIndex(i / 16, offset);
-            if (measurement <= 1 || z < -1.5) {//|| z < 10 ) {
-                m_points[i / 16][offset].setVisited(true);
-
-
-                //// not jet correctly fixed.. ground should not connect clusters...
-
-
-
-                // ebenne in sektoren einteilen
-                // mehrere minima in den sektoren finden...
-                // ebenne aus minima berechnen (evtl RANSAC)
-
-
-                m_points[i / 16][offset].setClustered(true);
-            }
+//            if (measurement <= 2 || z < -1.8) {//|| z < 10 ) {
+//                m_points[i / 16][offset].setVisited(true);
+//
+//
+//                //// not jet correctly fixed.. ground should not connect clusters...
+//
+//
+//
+//                // ebenne in sektoren einteilen
+//                // mehrere minima in den sektoren finden...
+//                // ebenne aus minima berechnen (evtl RANSAC)
+//
+//
+//                m_points[i / 16][offset].setClustered(true);
+//            }
         }
     }
 
     //ground detection
     // Future: may applay only in front and rear area
 
-    vector<Point> ground_candidates;
     //devide in 10 sections
     unsigned int sector_size = m_cloudSize / 8;
     std::vector<Point *> minis;
     for (int sec = 0; sec < 8; sec += 1) {
         std::vector<Point *> tmp = utils::minZinSec(sector_size * sec, sector_size * (sec + 1), m_points);
+        //for (Point *mini:tmp) {
+        //    cout << *mini << endl;
+        //}
+        //cout << "----" << endl;
         minis.insert(minis.end(), tmp.begin(), tmp.end());
 
 //        for(int i=0; i<3;i++){
@@ -91,22 +123,34 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
 //            cout<<"L: "<<tmp[i]->getLayer()<<endl;
 //        }
     }
+//    std::vector<Point *> tmp = utils::minZinSec(sector_size * 0, sector_size * (0 + 1), m_points);
+//    minis.insert(minis.end(), tmp.begin(), tmp.end());
+//    tmp = utils::minZinSec(sector_size * 11, sector_size * (11 + 1), m_points);
+//    minis.insert(minis.end(), tmp.begin(), tmp.end());
+//    tmp = utils::minZinSec(sector_size * 5, sector_size * (5 + 1), m_points);
+//    minis.insert(minis.end(), tmp.begin(), tmp.end());
+//    tmp = utils::minZinSec(sector_size * 6, sector_size * (6 + 1), m_points);
+//    minis.insert(minis.end(), tmp.begin(), tmp.end());
+
     // RANSAC
     double besterror = 100000000;
-    Plane bestmodel;
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, ((minis.size() - 1) / 4));
+    std::uniform_int_distribution<> dis(0, ((minis.size() - 1)/3));
 
     for (int probes = 0; probes < 50; probes++) {
         std::vector<Point *> maybeinliers;
         std::vector<Point *> alsoinliers;
         // select 3 random points
+     maybeinliers.push_back(minis[dis(gen)]);
+       maybeinliers.push_back(minis[dis(gen)]);
+       maybeinliers.push_back(minis[dis(gen)]);
+
         int offset = dis(gen);
-        maybeinliers.push_back(minis[offset]);
-        maybeinliers.push_back(minis[offset + ((minis.size() - 1) / 4)]);
-        maybeinliers.push_back(minis[offset + 2 * ((minis.size() - 1) / 4)]);
+//        maybeinliers.push_back(minis[offset]);
+//        maybeinliers.push_back(minis[offset + ((minis.size() - 1) / 3)]);
+//        maybeinliers.push_back(minis[offset + 2 * ((minis.size() - 1) / 3)]);
         Plane maybemodel(maybeinliers);
 
         for (auto &point : minis) {
@@ -122,35 +166,57 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             // now test how good it is
             Plane plane;
             double err = plane.fitPlaneFromPoints(alsoinliers);
-            if(err<besterror) {
-                besterror=err;
-                bestmodel = maybemodel;
+            if (err < besterror && plane.distance > 1.7 && plane.distance < 2.1) {
+                besterror = err;
+                m_bestGroundModel = plane;
             }
         }
     }
-    cout<<"BestErr: "<<besterror<<endl;
-    cout<<bestmodel.distance<< " : " <<bestmodel.normal<<endl;
+    cout << "BestErr: " << besterror << endl;
+    cout << "Groundplane Distance: " << m_bestGroundModel.distance << endl << "Vector: " << endl
+         << m_bestGroundModel.normal << endl;
 
+    for (uint32_t i = 0; i < m_cloudSize; i += 1) {
+        for (uint32_t offset = 0; offset < 16; offset++) {
+            Eigen::Vector3f point=m_points[i][offset].getVec();
+            if (m_bestGroundModel.getDist(point) > -0.3) {  //measurement <= 2 ||
+                //cout<<"Delete"<<endl;
+                m_points[i / 16][offset].setVisited(true);
+                m_points[i / 16][offset].setClustered(true);
+                m_points[i / 16][offset].setIsGround(true);
+            }
+        }
+    }
 
 }
 
 
 void PointcloudClustering::nextContainer(Container &c) {
-    cout << "-----------------------------" << endl;
+    if (c.getDataType() == opendlv::core::sensors::applanix::Grp1Data::ID()) {
+        opendlv::core::sensors::applanix::Grp1Data imu = c.getData<opendlv::core::sensors::applanix::Grp1Data>();
+        //cout << imu.getHeading() << endl;
+        m_lat = imu.getLat();
+        m_lon = imu.getLon();
+        //m_heading = imu.getHeading();
+
+        Point3 cart = m_origin->transform(opendlv::data::environment::WGS84Coordinate(imu.getLat(), imu.getLon()));
+        m_x = cart.getX();
+        m_y = cart.getY();
+        //cout << "CartesianPos: " << cart << endl;
+        //cv::Mat image(1000, 1000, CV_8UC3, cv::Scalar(0, 0, 0));
+        //cv::circle(image, cv::Point(cart.getX() + 500, (-1 * cart.getY()) + 500), 2, cv::Scalar(0, 0, 255));
+
+    }
+
     if (c.getDataType() == CompactPointCloud::ID()) {
+        cout << "-----------------------------" << endl;
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
         CompactPointCloud cpc = c.getData<CompactPointCloud>();
-
         transform(cpc);
 
 
-
         //detect ground
-
-
-
-
 
         DbScan dbScan = DbScan(m_points, m_cloudSize);
 
@@ -197,19 +263,49 @@ void PointcloudClustering::nextContainer(Container &c) {
         std::cout << "Time difference = " << millis << std::endl;
         //cout << "--------------------------" << endl << endl;
 
-        const static int res = 800;
+        const static int res = 1000;
         const static int zoom = 12;
 
 
         cv::Mat image(res, res, CV_8UC3, cv::Scalar(0, 0, 0));
-        for (int i = 0; i < m_cloudSize; i++) {
+
+
+//        for (auto &layer : m_scenario->getListOfLayers()) {
+//            //cout << layer.getLongName() << endl;
+//            for (auto &road : layer.getListOfRoads()) {
+//                //cout << road.getLongName() << endl;
+//                for (auto &lane : road.getListOfLanes()) {
+//                    opendlv::data::scenario::LaneModel *model = lane.getLaneModel();
+//                    if (model->getType() == model->POINTMODEL) {
+//                        opendlv::data::scenario::PointModel *pointmodel = static_cast<opendlv::data::scenario::PointModel *>(model);
+//                        vector<opendlv::data::scenario::IDVertex3> vertexes = pointmodel->getListOfIdentifiableVertices();
+//                        bool first = false;
+//                        cv::Point oldPoint = cv::Point(0, 0);
+//                        for (auto &vertex : vertexes) {
+//                            cv::Point newPoint = cv::Point((vertex.getX() - m_x) * zoom + res / 2,
+//                                                           (-1 * (vertex.getY() - m_y)) * zoom + res / 2);
+//                            if (first) {
+//                                cv::line(image, oldPoint,
+//                                         newPoint, cv::Scalar(255, 255, 0), 1, 8, 0);
+//                            }
+//                            oldPoint = newPoint;
+//                            first = true;
+//                        }
+//                    }
+//
+//                }
+//            }
+//        }
+
+
+        for (uint32_t i = 0; i < m_cloudSize; i++) {
             for (int j = 0; j < 16; j++) {
                 Point *point = &m_points[i][j];
                 int x = static_cast<int>(point->getX() * zoom) + res / 2;
                 int y = static_cast<int>(point->getY() * zoom) + res / 2;
                 if ((x < 800) && (y < 800) && (y >= 0) && (x >= 0)) {
                     // if (point->getMeasurement() > 1 && ( point->getPos()[3] <0  && point->getPos()[3] > -1)) {
-                    if (point->getMeasurement() <= 1 || point->getZ() < -1.5) {
+                    if (point->getIsGround()) {
                         image.at<cv::Vec3b>(y, x)[0] = 0;
                         image.at<cv::Vec3b>(y, x)[1] = 0;
                         image.at<cv::Vec3b>(y, x)[2] = 255;
@@ -224,54 +320,59 @@ void PointcloudClustering::nextContainer(Container &c) {
             }
         }
 
-
-        for (auto &cluster : clusters) {
-            for (auto point : (cluster.m_cluster)) {
-                int x = static_cast<int>(point->getX() * zoom) + res / 2;
-                int y = static_cast<int>(point->getY() * zoom) + res / 2;
-                if ((x < res) && (y < res) && (y >= 0) && (x >= 0)) {
-                    if (cluster.m_id % 3 == 0) {
-                        image.at<cv::Vec3b>(y, x)[0] = 255;
-                        image.at<cv::Vec3b>(y, x)[1] = 0;
-                        image.at<cv::Vec3b>(y, x)[2] = 0;
-                    }
-                    if (cluster.m_id % 3 == 1) {
-                        image.at<cv::Vec3b>(y, x)[0] = 0;
-                        image.at<cv::Vec3b>(y, x)[1] = 255;
-                        image.at<cv::Vec3b>(y, x)[2] = 0;
-                    }
-                    if (cluster.m_id % 3 == 2) {
-                        image.at<cv::Vec3b>(y, x)[0] = 0;
-                        image.at<cv::Vec3b>(y, x)[1] = 0;
-                        image.at<cv::Vec3b>(y, x)[2] = 255;
-                    }
-
-                }
-            }
-        }
+//
+//        for (auto &cluster : clusters) {
+//            for (auto point : (cluster.m_cluster)) {
+//                int x = static_cast<int>(point->getX() * zoom) + res / 2;
+//                int y = static_cast<int>(point->getY() * zoom) + res / 2;
+//                if ((x < res) && (y < res) && (y >= 0) && (x >= 0)) {
+//                    if (cluster.m_id % 3 == 0) {
+//                        image.at<cv::Vec3b>(y, x)[0] = 255;
+//                        image.at<cv::Vec3b>(y, x)[1] = 0;
+//                        image.at<cv::Vec3b>(y, x)[2] = 0;
+//                    }
+//                    if (cluster.m_id % 3 == 1) {
+//                        image.at<cv::Vec3b>(y, x)[0] = 0;
+//                        image.at<cv::Vec3b>(y, x)[1] = 255;
+//                        image.at<cv::Vec3b>(y, x)[2] = 0;
+//                    }
+//                    if (cluster.m_id % 3 == 2) {
+//                        image.at<cv::Vec3b>(y, x)[0] = 0;
+//                        image.at<cv::Vec3b>(y, x)[1] = 0;
+//                        image.at<cv::Vec3b>(y, x)[2] = 255;
+//                    }
+//
+//                }
+//            }
+//        }
 
         for (auto &cluster : clusters) {
             auto hull = utils::convex_hull(cluster);
             std::stringstream ss;
             ss << cluster.m_id;
 
-            cv::putText(image, ss.str(), cv::Point(cluster.m_center[0] * zoom + res / 2, cluster.m_center[1] * zoom + res / 2), cv::FONT_HERSHEY_SIMPLEX, 0.33,
+            cv::putText(image, ss.str(),
+                        cv::Point(cluster.m_center[0] * zoom + res / 2, cluster.m_center[1] * zoom + res / 2),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.33,
                         cv::Scalar(255, 255, 255));
-            for (int i = 1; i < hull.size(); i++) {
+            for (uint32_t i = 1; i < hull.size(); i++) {
                 cv::line(image, cv::Point(hull[i - 1]->getX() * zoom + res / 2, hull[i - 1]->getY() * zoom + res / 2),
                          cv::Point(hull[i]->getX() * zoom + res / 2, hull[i]->getY() * zoom + res / 2),
                          cv::Scalar(255, 255, 0), 1, 8, 0);
             }
             if (hull.size() > 1)
-                cv::line(image, cv::Point(hull[hull.size() - 1]->getX() * zoom + res / 2, hull[hull.size() - 1]->getY() * zoom + res / 2),
-                         cv::Point(hull[0]->getX() * zoom + res / 2, hull[0]->getY() * zoom + res / 2), cv::Scalar(255, 255, 0), 1, 8, 0);
+                cv::line(image, cv::Point(hull[hull.size() - 1]->getX() * zoom + res / 2,
+                                          hull[hull.size() - 1]->getY() * zoom + res / 2),
+                         cv::Point(hull[0]->getX() * zoom + res / 2, hull[0]->getY() * zoom + res / 2),
+                         cv::Scalar(255, 255, 0), 1, 8, 0);
         }
 
 
-        cv::line(image, cv::Point(res - 20 - zoom, res - 20), cv::Point(res - 20, res - 20), cv::Scalar(255, 255, 0), 1);
+        cv::line(image, cv::Point(res - 20 - zoom, res - 20), cv::Point(res - 20, res - 20), cv::Scalar(255, 255, 0),
+                 1);
 
 
-        cv::imshow("Display Image", image);
+        cv::imshow("Lidar", image);
 
         cv::waitKey(1);
     }

@@ -8,15 +8,14 @@
 #include <eigen3/Eigen/Dense>
 
 
-Point::Point(float x, float y, float z, float azimuth, float measurement) {
-    m_x = x;
-    m_y = y;
-    m_z = z;
+Point::Point(float x, float y, float z, float measurement, float azimuth) : m_point(x, y, z) {
+
     m_azimuth = azimuth;
     m_measurement = measurement;
     m_visited = false;
     m_noise = false;
     m_clustered = false;
+    m_isGround = false;
 }
 
 
@@ -26,32 +25,40 @@ Point::Point() {
     m_clustered = false;
 }
 
-Eigen::Vector3f Point::getVec(){
-    return Eigen::Vector3f(m_x,m_y,m_z);
+Eigen::Vector3f &Point::getVec() {
+    return m_point;
 }
 
 void Point::setX(float x) {
-    m_x = x;
+    m_point[0] = x;
+}
+
+void Point::setIsGround(bool isGround) {
+    m_isGround = isGround;
+}
+
+bool Point::getIsGround() {
+    return m_isGround;
 }
 
 void Point::setY(float y) {
-    m_y = y;
+    m_point[1] = y;
 }
 
 void Point::setZ(float z) {
-    m_z = z;
+    m_point[2] = z;
 }
 
-const float Point::getX() const{
-    return m_x;
+const float Point::getX() const {
+    return m_point[0];
 }
 
-const float Point::getY() const{
-    return m_y;
+const float Point::getY() const {
+    return m_point[1];
 }
 
-const float Point::getZ() const{
-    return m_z;
+const float Point::getZ() const {
+    return m_point[2];
 }
 
 float Point::getAzimuth() {
@@ -63,8 +70,8 @@ float Point::getMeasurement() {
 }
 
 float Point::get2Distance(Point &a) {
-    float x = m_x - a.getX();
-    float y = m_y - a.getY();
+    float x = m_point[0] - a.getX();
+    float y = m_point[1] - a.getY();
     return std::sqrt(x * x + y * y);
 }
 

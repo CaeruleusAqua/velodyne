@@ -1,6 +1,7 @@
 #include "Plane.h"
 
 double Plane::fitPlaneFromPoints(std::vector<Point *> &points) {
+    // http://www.ilikebigbits.com/blog/2015/3/2/plane-from-points
     assert(points.size() > 3);
     Eigen::Vector3f sum(0, 0, 0);
     for (auto &point : points) {
@@ -58,6 +59,8 @@ double Plane::fitPlaneFromPoints(std::vector<Point *> &points) {
 
     return error;
 }
+
+
 
 Plane::Plane(std::vector<Point *> &points){
     auto a=points[0]->getVec(),b=points[1]->getVec(),c=points[2]->getVec();

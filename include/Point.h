@@ -5,10 +5,11 @@
 
 class Point {
 private:
-    float m_x, m_y, m_z;
     float m_azimuth;
     float m_measurement;
     bool m_visited;
+    bool m_isGround;
+    Eigen::Vector3f m_point;
 
 
 public:
@@ -18,9 +19,13 @@ public:
     bool m_noise;
     bool m_clustered;
 
-    Point(float x, float y, float z, float azimuth, float measurement);
+    Point(float x, float y, float z, float measurement, float azimuth);
 
     Point();
+
+    void setIsGround(bool isGround);
+
+    bool getIsGround();
 
     void setX(float x);
 
@@ -34,7 +39,7 @@ public:
 
     const float getZ() const;
 
-    Eigen::Vector3f getVec();
+    Eigen::Vector3f &getVec();
 
     float getAzimuth();
 
@@ -57,11 +62,11 @@ public:
     int getLayer();
 
     bool operator<(const Point &p) const {
-        return (m_x < p.getX() || (m_x == p.getX() && m_y < p.getY()));
+        return (m_point[0] < p.getX() || (m_point[0] == p.getX() && m_point[1] < p.getY()));
     }
 
-    friend std::ostream &operator<<(std::ostream &strm, Point const & point) {
-        return strm << " X: " << point.m_x << " Y: " << point.m_y << " Z: " << point.m_z;
+    friend std::ostream &operator<<(std::ostream &strm, Point const &point) {
+        return strm << " X: " << point.m_point[0] << " Y: " << point.m_point[1] << " Z: " << point.m_point[2];
     }
 
 };

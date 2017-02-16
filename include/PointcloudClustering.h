@@ -2,13 +2,15 @@
 
 #include <opendavinci/odcore/base/module/DataTriggeredConferenceClientModule.h>
 #include "opendavinci/generated/odcore/data/CompactPointCloud.h"
-#include "opendavinci/odcore/wrapper/half_float.h"
+#include "opendlv/data/scenario/Scenario.h"
+#include "opendlv/data/environment/WGS84Coordinate.h"
 #include "Utils.h"
 #include "Point.h"
 #include <iostream>
 #include <array>
 #include "dbscan.h"
 #include "Cluster.h"
+#include "Plane.h"
 
 class PointcloudClustering : public odcore::base::module::DataTriggeredConferenceClientModule {
 private:
@@ -55,9 +57,16 @@ private:
     unsigned int m_cloudSize;
     std::vector<Cluster> m_old_clusters;
 
+    opendlv::data::scenario::Scenario *m_scenario;
+    opendlv::data::environment::WGS84Coordinate *m_origin;
+
+    double m_x, m_y, m_lon, m_lat, m_heading=0;
+    Plane m_bestGroundModel;
+
+//    opendlv::core::sensors::applanix::Grp1Data *m_imu;
 
 
-
+    Plane m_ground;
     static constexpr float m_eps = 1000;
     static constexpr uint32_t m_minPts = 20;
     unsigned int m_id_counter = 0;
