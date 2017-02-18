@@ -25,7 +25,7 @@ public:
 
     void setIsGround(bool isGround);
 
-    bool getIsGround();
+    bool isGround();
 
     void setX(float x);
 

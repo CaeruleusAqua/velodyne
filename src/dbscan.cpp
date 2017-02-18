@@ -34,7 +34,7 @@ void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
 
     for (uint32_t k = m_cloudSize + neg_idx; k < m_cloudSize; k++) {
         for (int l = 0; l < 16; l++) {
-            if (point->get2Distance(m_points[k][l]) < m_eps) {
+            if (!point->isGround() && point->get2Distance(m_points[k][l]) < m_eps) {
                 neighbors.push_back(&m_points[k][l]);
             }
 
@@ -43,7 +43,7 @@ void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
 
     for (int k = 0; k < pos_idx; k++) {
         for (int l = 0; l < 16; l++) {
-            if (point->get2Distance(m_points[k][l]) < m_eps) {
+            if (!point->isGround() && point->get2Distance(m_points[k][l]) < m_eps) {
                 neighbors.push_back(&m_points[k][l]);
             }
 
@@ -52,7 +52,7 @@ void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
 
     for (int k = std::max(0, neg_idx); k < std::min(i + 1 + didx, (int) m_cloudSize); k++) {
         for (int l = 0; l < 16; l++) {
-            if (point->get2Distance(m_points[k][l]) < m_eps) {
+            if (!point->isGround() && point->get2Distance(m_points[k][l]) < m_eps) {
                 neighbors.push_back(&m_points[k][l]);
             }
 

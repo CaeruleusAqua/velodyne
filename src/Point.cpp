@@ -37,7 +37,7 @@ void Point::setIsGround(bool isGround) {
     m_isGround = isGround;
 }
 
-bool Point::getIsGround() {
+bool Point::isGround() {
     return m_isGround;
 }
 

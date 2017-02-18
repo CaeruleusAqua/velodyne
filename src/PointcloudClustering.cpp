@@ -66,10 +66,11 @@ void PointcloudClustering::tearDown() {
 
 void PointcloudClustering::transform(CompactPointCloud &cpc) {
     static const int maping[] = {-15, -13, -11, -9, -7, -5, -3, -1, 1, 3, 5, 7, 9, 11, 13, 15};
+    //static const int maping[] = {-15, -14,-13,-12, -11,-10, -9, -9,-7,-6, -5,-4, -3,-2, -1,0};//, 1,2, 3,4, 5,6, 7,8, 9,10, 11,12, 13,14, 15};
     std::string distances = cpc.getDistances();
     m_cloudSize = distances.size() / 2 / 16;
-    vector<double> azimuth_range = utils::linspace(utils::deg2rad(-cpc.getStartAzimuth() - m_heading + 180),
-                                                   utils::deg2rad(-cpc.getEndAzimuth() - m_heading + 180), m_cloudSize);
+    vector<double> azimuth_range = utils::linspace(utils::deg2rad(-cpc.getStartAzimuth() - m_heading ),
+                                                   utils::deg2rad(-cpc.getEndAzimuth() - m_heading), m_cloudSize);
     const uint16_t *data = reinterpret_cast<const uint16_t *>(distances.c_str());
 
     for (uint32_t i = 0; i < distances.size() / 2; i += 16) {
@@ -82,6 +83,9 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             float z = measurement * sin(static_cast<float>(utils::deg2rad(maping[offset])));
             m_points[i / 16][offset] = Point(x, y, z, measurement, azimuth);
             m_points[i / 16][offset].setIndex(i / 16, offset);
+            if (measurement <= 1.8)
+                m_points[i / 16][offset].setIsGround(true);
+
 
         }
     }
@@ -139,7 +143,7 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             // now test how good it is
             Plane plane;
             double err = plane.fitPlaneFromPoints(alsoinliers);
-            if (err < besterror && plane.distance > 1.7 && plane.distance < 2.1) {
+            if (err < besterror && plane.distance > 1.9 && plane.distance < 2.1) {
                 besterror = err;
                 m_bestGroundModel = plane;
             }
@@ -152,7 +156,8 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
     for (uint32_t i = 0; i < m_cloudSize; i += 1) {
         for (uint32_t offset = 0; offset < 16; offset++) {
             Eigen::Vector3f point = m_points[i][offset].getVec();
-            if (m_bestGroundModel.getDist(point) > -0.3) {  //measurement <= 2 ||
+            //if (m_bestGroundModel.getDist(point) > -0.5) {  //measurement <= 2 ||
+            if (point[2] < -1.5) {  //measurement <= 2 ||
                 //cout<<"Delete"<<endl;
                 m_points[i][offset].setVisited(true);
                 m_points[i][offset].setClustered(true);
@@ -170,7 +175,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         //cout << imu.getHeading() << endl;
         m_lat = imu.getLat();
         m_lon = imu.getLon();
-        //m_heading = imu.getHeading();
+        m_heading = imu.getHeading();
 
         Point3 cart = m_origin->transform(opendlv::data::environment::WGS84Coordinate(imu.getLat(), imu.getLon()));
         m_x = cart.getX();
@@ -243,32 +248,32 @@ void PointcloudClustering::nextContainer(Container &c) {
         cv::Mat image(res, res, CV_8UC3, cv::Scalar(0, 0, 0));
 
 
-//        for (auto &layer : m_scenario->getListOfLayers()) {
-//            //cout << layer.getLongName() << endl;
-//            for (auto &road : layer.getListOfRoads()) {
-//                //cout << road.getLongName() << endl;
-//                for (auto &lane : road.getListOfLanes()) {
-//                    opendlv::data::scenario::LaneModel *model = lane.getLaneModel();
-//                    if (model->getType() == model->POINTMODEL) {
-//                        opendlv::data::scenario::PointModel *pointmodel = static_cast<opendlv::data::scenario::PointModel *>(model);
-//                        vector<opendlv::data::scenario::IDVertex3> vertexes = pointmodel->getListOfIdentifiableVertices();
-//                        bool first = false;
-//                        cv::Point oldPoint = cv::Point(0, 0);
-//                        for (auto &vertex : vertexes) {
-//                            cv::Point newPoint = cv::Point((vertex.getX() - m_x) * zoom + res / 2,
-//                                                           (-1 * (vertex.getY() - m_y)) * zoom + res / 2);
-//                            if (first) {
-//                                cv::line(image, oldPoint,
-//                                         newPoint, cv::Scalar(255, 255, 0), 1, 8, 0);
-//                            }
-//                            oldPoint = newPoint;
-//                            first = true;
-//                        }
-//                    }
-//
-//                }
-//            }
-//        }
+        for (auto &layer : m_scenario->getListOfLayers()) {
+            //cout << layer.getLongName() << endl;
+            for (auto &road : layer.getListOfRoads()) {
+                //cout << road.getLongName() << endl;
+                for (auto &lane : road.getListOfLanes()) {
+                    opendlv::data::scenario::LaneModel *model = lane.getLaneModel();
+                    if (model->getType() == model->POINTMODEL) {
+                        opendlv::data::scenario::PointModel *pointmodel = static_cast<opendlv::data::scenario::PointModel *>(model);
+                        vector<opendlv::data::scenario::IDVertex3> vertexes = pointmodel->getListOfIdentifiableVertices();
+                        bool first = false;
+                        cv::Point oldPoint = cv::Point(0, 0);
+                        for (auto &vertex : vertexes) {
+                            cv::Point newPoint = cv::Point((vertex.getX() - m_x) * zoom + res / 2,
+                                                           (-1 * (vertex.getY() - m_y)) * zoom + res / 2);
+                            if (first) {
+                                cv::line(image, oldPoint,
+                                         newPoint, cv::Scalar(255, 255, 0), 1, 8, 0);
+                            }
+                            oldPoint = newPoint;
+                            first = true;
+                        }
+                    }
+
+                }
+            }
+        }
 
 
         for (uint32_t i = 0; i < m_cloudSize; i++) {
@@ -278,7 +283,7 @@ void PointcloudClustering::nextContainer(Container &c) {
                 int y = static_cast<int>(point->getY() * zoom) + res / 2;
                 if ((x < 800) && (y < 800) && (y >= 0) && (x >= 0)) {
                     // if (point->getMeasurement() > 1 && ( point->getPos()[3] <0  && point->getPos()[3] > -1)) {
-                    if (point->getIsGround()) {
+                    if (point->isGround()) {
                         image.at<cv::Vec3b>(y, x)[0] = 0;
                         image.at<cv::Vec3b>(y, x)[1] = 0;
                         image.at<cv::Vec3b>(y, x)[2] = 255;
@@ -323,6 +328,19 @@ void PointcloudClustering::nextContainer(Container &c) {
             auto hull = utils::convex_hull(cluster);
             std::stringstream ss;
             ss << cluster.m_id;
+
+            std::vector<cv::Point2f> vec;
+            for(auto &point : hull){
+                vec.push_back(cv::Point2f(point->getX(),point->getY()));
+            }
+            if(vec.size() > 2) {
+                auto rect = cv::minAreaRect(vec);
+                cv::Point2f rec[4];
+                rect.points(rec);
+                //cv::rectangle(image, rect, cv::Scalar(255, 0, 255), 1, 8, 0 );
+                for (int j = 0; j < 4; j++)
+                    cv::line(image, cv::Point(rec[j].x* zoom + res / 2,rec[j].y* zoom + res / 2), cv::Point(rec[(j + 1) % 4].x* zoom + res / 2,rec[(j + 1) % 4].y* zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
+            }
 
             cv::putText(image, ss.str(),
                         cv::Point(cluster.m_center[0] * zoom + res / 2, cluster.m_center[1] * zoom + res / 2),
