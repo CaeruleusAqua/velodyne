@@ -4,7 +4,11 @@
 LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw) {
     m_x << x, y, theta, y, yaw;
     m_I.setIdentity();
-    m_P << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1;
+
+    Eigen::Matrix<double, 5, 1> tmp;
+    tmp << 1000,1000,1000,1000,1000;
+    m_P = tmp.asDiagonal();
+    //m_P << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1;
     double varGPS = 6.0;    // Standard Deviation of GPS Measurement
     double varspeed = 1.0;  // Variance of the speed measurement
     double varyaw = 0.1;    // Variance of the yawrate measurement
