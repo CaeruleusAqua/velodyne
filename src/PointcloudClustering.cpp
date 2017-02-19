@@ -20,6 +20,7 @@
 #include <opendlv/data/environment/WGS84Coordinate.h>
 
 #include "odvdapplanix/GeneratedHeaders_ODVDApplanix.h"
+#include "Obstacle.h"
 
 using namespace std;
 
@@ -39,6 +40,9 @@ PointcloudClustering::PointcloudClustering(const int32_t &argc, char **argv) :
 PointcloudClustering::~PointcloudClustering() {}
 
 void PointcloudClustering::setUp() {
+
+
+    LidarObstacle test(0, 0, 0, 0, 0);
     cout << "This method is called before the component's body is executed." << endl;
     cv::namedWindow("Lidar", cv::WINDOW_AUTOSIZE);
     const odcore::io::URL urlOfSCNXFile(getKeyValueConfiguration().getValue<string>("global.scenario"));
@@ -69,7 +73,7 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
     //static const int maping[] = {-15, -14,-13,-12, -11,-10, -9, -9,-7,-6, -5,-4, -3,-2, -1,0};//, 1,2, 3,4, 5,6, 7,8, 9,10, 11,12, 13,14, 15};
     std::string distances = cpc.getDistances();
     m_cloudSize = distances.size() / 2 / 16;
-    vector<double> azimuth_range = utils::linspace(utils::deg2rad(-cpc.getStartAzimuth() - m_heading ),
+    vector<double> azimuth_range = utils::linspace(utils::deg2rad(-cpc.getStartAzimuth() - m_heading),
                                                    utils::deg2rad(-cpc.getEndAzimuth() - m_heading), m_cloudSize);
     const uint16_t *data = reinterpret_cast<const uint16_t *>(distances.c_str());
 
@@ -124,7 +128,7 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
         maybeinliers.push_back(minis[dis(gen)]);
         maybeinliers.push_back(minis[dis(gen)]);
 
-        int offset = dis(gen);
+//        int offset = dis(gen);
 //        maybeinliers.push_back(minis[offset]);
 //        maybeinliers.push_back(minis[offset + ((minis.size() - 1) / 3)]);
 //        maybeinliers.push_back(minis[offset + 2 * ((minis.size() - 1) / 3)]);
@@ -330,16 +334,17 @@ void PointcloudClustering::nextContainer(Container &c) {
             ss << cluster.m_id;
 
             std::vector<cv::Point2f> vec;
-            for(auto &point : hull){
-                vec.push_back(cv::Point2f(point->getX(),point->getY()));
+            for (auto &point : hull) {
+                vec.push_back(cv::Point2f(point->getX(), point->getY()));
             }
-            if(vec.size() > 2) {
+            if (vec.size() > 2) {
                 auto rect = cv::minAreaRect(vec);
                 cv::Point2f rec[4];
                 rect.points(rec);
                 //cv::rectangle(image, rect, cv::Scalar(255, 0, 255), 1, 8, 0 );
                 for (int j = 0; j < 4; j++)
-                    cv::line(image, cv::Point(rec[j].x* zoom + res / 2,rec[j].y* zoom + res / 2), cv::Point(rec[(j + 1) % 4].x* zoom + res / 2,rec[(j + 1) % 4].y* zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
+                    cv::line(image, cv::Point(rec[j].x * zoom + res / 2, rec[j].y * zoom + res / 2),
+                             cv::Point(rec[(j + 1) % 4].x * zoom + res / 2, rec[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
             }
 
             cv::putText(image, ss.str(),

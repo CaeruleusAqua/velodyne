@@ -2,17 +2,20 @@
 
 #include <vector>
 #include "Point.h"
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 
-class Obstacle {
+class LidarObstacle {
 private:
-    Eigen::Vector4d x;
-    Eigen::Matrix4d P;
-    Eigen::Matrix4d I;
+    Eigen::Matrix<double, 5, 1> m_x;
+    Eigen::Matrix<double, 5, 5> m_P;
+    Eigen::Matrix<double, 5, 5> m_I;
+    Eigen::Matrix<double, 4, 4> m_R;
 
 
 public:
-    Obstacle(double x, double y);
-    predict(self,);
+    LidarObstacle(double x, double y, double theta, double v, double yaw);
 
+    void predict(double dt);
+
+    void update(Eigen::Vector4d Z);
 };
