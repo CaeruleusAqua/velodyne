@@ -1,7 +1,7 @@
 #include "PointcloudClustering.h"
 #include <opencv2/imgproc/imgproc.hpp>
 #include <chrono>
-#include <random>
+
 #include "opendlv/scenario/SCNXArchive.h"
 #include "opendlv/scenario/SCNXArchiveFactory.h"
 #include "opendlv/scenario/ScenarioFactory.h"
@@ -35,14 +35,13 @@ using namespace automotive::miniature;
 using namespace opendlv::data::environment;
 
 PointcloudClustering::PointcloudClustering(const int32_t &argc, char **argv) :
-        DataTriggeredConferenceClientModule(argc, argv, "PointcloudClustering") {};
+        DataTriggeredConferenceClientModule(argc, argv, "PointcloudClustering"),
+        gen(rd()) {};
 
 PointcloudClustering::~PointcloudClustering() {}
 
 void PointcloudClustering::setUp() {
 
-
-    LidarObstacle test(0, 0, 0, 0, 0);
     cout << "This method is called before the component's body is executed." << endl;
     cv::namedWindow("Lidar", cv::WINDOW_AUTOSIZE);
     const odcore::io::URL urlOfSCNXFile(getKeyValueConfiguration().getValue<string>("global.scenario"));
@@ -94,16 +93,18 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
         }
     }
 
-    //ground detection
-    // Future: may applay only in front and rear area
+}
 
-    //devide in sections
+void PointcloudClustering::segmentGroundByPlane() {
+    // devide measurement in sections
     unsigned int sector_size = m_cloudSize / 8;
     std::vector<Point *> minis;
     for (int sec = 0; sec < 8; sec += 1) {
         std::vector<Point *> tmp = utils::minZinSec(sector_size * sec, sector_size * (sec + 1), m_points);
         minis.insert(minis.end(), tmp.begin(), tmp.end());
     }
+
+
 //    std::vector<Point *> tmp = utils::minZinSec(sector_size * 0, sector_size * (0 + 1), m_points);
 //    minis.insert(minis.end(), tmp.begin(), tmp.end());
 //    tmp = utils::minZinSec(sector_size * 11, sector_size * (11 + 1), m_points);
@@ -116,8 +117,6 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
     // RANSAC
     double besterror = 100000000;
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, ((minis.size() - 1) / 3));
 
     for (int probes = 0; probes < 50; probes++) {
@@ -128,10 +127,13 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
         maybeinliers.push_back(minis[dis(gen)]);
         maybeinliers.push_back(minis[dis(gen)]);
 
+        // Triange fitting
 //        int offset = dis(gen);
 //        maybeinliers.push_back(minis[offset]);
 //        maybeinliers.push_back(minis[offset + ((minis.size() - 1) / 3)]);
 //        maybeinliers.push_back(minis[offset + 2 * ((minis.size() - 1) / 3)]);
+
+
         Plane maybemodel(maybeinliers);
 
         for (auto &point : minis) {
@@ -159,9 +161,23 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
 
     for (uint32_t i = 0; i < m_cloudSize; i += 1) {
         for (uint32_t offset = 0; offset < 16; offset++) {
-            Eigen::Vector3f point = m_points[i][offset].getVec();
-            //if (m_bestGroundModel.getDist(point) > -0.5) {  //measurement <= 2 ||
-            if (point[2] < -1.5) {  //measurement <= 2 ||
+            //Eigen::Vector3f point = m_points[i][offset].getVec();
+            if (m_bestGroundModel.getDist(m_points[i][offset].getVec()) > -0.5) {
+                m_points[i][offset].setVisited(true);
+                m_points[i][offset].setClustered(true);
+                m_points[i][offset].setIsGround(true);
+            }
+        }
+    }
+
+}
+
+
+void PointcloudClustering::segmentGroundByHeight() {
+    for (uint32_t i = 0; i < m_cloudSize; i += 1) {
+        for (uint32_t offset = 0; offset < 16; offset++) {
+            //Eigen::Vector3f point = m_points[i][offset].getVec();
+            if (m_points[i][offset].getZ() < -1.5) {
                 //cout<<"Delete"<<endl;
                 m_points[i][offset].setVisited(true);
                 m_points[i][offset].setClustered(true);
@@ -172,6 +188,140 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
 
 }
 
+
+void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
+
+
+    if (m_old_clusters.size() == 0) {
+        m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
+    } else {
+        cout << "Searching Cluster.." << endl;
+        for (auto &new_cluster : clusters) {
+            double min_dist = 10000;
+            Cluster *next = nullptr;
+            for (auto &old_cluster : m_old_clusters) {
+                if (!old_cluster.matched) {
+                    double dist = new_cluster.get2Distance(old_cluster);
+                    if (dist < min_dist) {
+                        next = &old_cluster;
+                        min_dist = dist;
+                    }
+                }
+            }
+            if (next != nullptr && min_dist < 3) {
+                new_cluster.m_id = next->m_id;
+                next->matched = false;
+            }
+        }
+        m_old_clusters.clear();
+        m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
+    }
+
+
+
+    // initial run
+    //cout << "Tracking Objects!" << endl;
+    if (m_obstacles.empty()) {
+        cout << "Initial tracking Objects..." << endl;
+        for (auto &cluster : clusters) {
+            cluster.calcRectangle();
+            if (cluster.getRectLongSite() < 7 && cluster.getRectShortSite() < 3) {
+                //classify Car or pedestrian
+                m_obstacles.push_front(LidarObstacle(cluster.m_center[0], cluster.m_center[1], cluster.getTheta(), 0, 0, &cluster));
+                m_obstacles.front().old_rot=cluster.getTheta();
+                m_obstacles.front().old_x = cluster.m_center[0];
+                m_obstacles.front().old_y = cluster.m_center[1];
+            }
+
+
+        }
+    } else {
+        //cout << "Repeat tracking Objects... Clusters to track: " << clusters.size() << endl;
+        //cout << "Obstacles to track: " << m_obstacles.size() << endl;
+        for (auto &obj : m_obstacles) {
+            obj.predict(0.1); // TODO adjust do dt
+        }
+        double distThreshold = 3.0;
+        LidarObstacle *closest_obstacle = nullptr;
+        for (auto &cluster : clusters) {
+            double closest_dist = 10000000;
+            for (auto &obst : m_obstacles) {
+                double dist = obst.getDistance(cluster);
+                if (dist < closest_dist && dist < distThreshold) {
+                    closest_obstacle = &obst;
+                    closest_dist = dist;
+                }
+            }
+            if (closest_obstacle != nullptr) {
+                //cout<<"Appending cluster to object!!"<<endl;
+                if (cluster.m_id == 93 || cluster.m_id == 95) {
+                    cout << "Append Cluster" << cluster.m_id <<" with distance: "<< closest_dist << " to " << closest_obstacle->m_initial_id << endl;
+                }
+                closest_obstacle->clusterCandidates.push_back(&cluster);
+            }
+
+        }
+
+        for (auto &obst : m_obstacles) {
+            //cout << "num clusterCandidates: " << obst.clusterCandidates.size() << endl;
+
+            double closest_dist = 10000000;
+            Cluster *closest_cluster = nullptr;
+            for (auto cluster : obst.clusterCandidates) {
+                double dist = obst.getDistance(*cluster);
+                if (dist < closest_dist) {
+                    closest_dist = dist;
+                    closest_cluster = cluster;
+                }
+            }
+            if (closest_cluster != nullptr) {
+                closest_cluster->calcRectangle();
+                Eigen::Vector4d tmp;
+                double oldTheta = obst.old_rot;
+
+                double srx = closest_cluster->m_center[0]-obst.old_x;
+                double sry = closest_cluster->m_center[1]-obst.old_y;
+                double speed = std::sqrt(sry*sry + srx * srx) / 0.1;
+                obst.old_x = closest_cluster->m_center[0];
+                obst.old_y = closest_cluster->m_center[1];
+
+                tmp << closest_cluster->m_center[0], closest_cluster->m_center[1], -speed,-(obst.old_rot-closest_cluster->getTheta())/0.1; // fix missing values
+
+                //obst.update(tmp);
+                obst.m_x[0]=closest_cluster->m_center[0];
+                obst.m_x[1]=closest_cluster->m_center[1];
+                obst.m_x[2]=closest_cluster->getTheta();
+                obst.m_x[3]=speed;
+                obst.m_x[4]=-(obst.old_rot-closest_cluster->getTheta())/0.1;
+                obst.old_rot=closest_cluster->getTheta();
+                if (obst.m_initial_id == 93 || obst.m_initial_id == 95) {
+                    cout << "Obst_id: " << obst.m_initial_id << " X: " << obst.m_x[0] << " Y:" << obst.m_x[1] << " Distance: " << obst.getDistance(*closest_cluster) << endl;
+                    cout << "Update " << obst.m_initial_id << " with " << closest_cluster->m_id << " at: X"<< closest_cluster->m_center[0]  <<" Y: "<< closest_cluster->m_center[1]<< endl;
+                    cout << "Old Rotation: " << oldTheta/M_PI*180 << " new Rotation: " <<closest_cluster->getTheta()/M_PI*180  <<endl;
+                    cout << "Speed: " << speed << " Yawrate: " << (oldTheta-closest_cluster->getTheta())/0.1 << endl;
+                }
+
+            }
+
+
+
+
+
+//            if(obst.clusterCandidates.size()>=1){
+//                Cluster *cluster = obst.clusterCandidates.front();
+//                Eigen::Vector4d tmp;
+//                tmp << cluster->m_center[0], cluster->m_center[1],0,0; // fix missing values
+//                obst.update(tmp);
+//                cout<<"Update: "<< cluster->m_id<<endl;
+//            }
+            obst.clusterCandidates.clear();
+        }
+
+
+    }
+
+
+}
 
 void PointcloudClustering::nextContainer(Container &c) {
     if (c.getDataType() == opendlv::core::sensors::applanix::Grp1Data::ID()) {
@@ -196,9 +346,8 @@ void PointcloudClustering::nextContainer(Container &c) {
 
         CompactPointCloud cpc = c.getData<CompactPointCloud>();
         transform(cpc);
+        segmentGroundByHeight();
 
-
-        //detect ground
 
         DbScan dbScan = DbScan(m_points, m_cloudSize);
 
@@ -210,31 +359,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         }
 
 
-        if (m_old_clusters.size() == 0) {
-            m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
-        } else {
-            cout << "Searching Cluster.." << endl;
-            for (auto &new_cluster : clusters) {
-                double min_dist = 10000;
-                Cluster *next = nullptr;
-                for (auto &old_cluster : m_old_clusters) {
-                    if (!old_cluster.matched) {
-                        double dist = new_cluster.get2Distance(old_cluster);
-                        if (dist < min_dist) {
-                            next = &old_cluster;
-                            min_dist = dist;
-                        }
-                    }
-                }
-                if (next != nullptr && min_dist < 3) {
-                    new_cluster.m_id = next->m_id;
-                    next->matched = false;
-                }
-            }
-            m_old_clusters.clear();
-            m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
-        }
-
+        trackObstacles(clusters);
 
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
@@ -328,39 +453,57 @@ void PointcloudClustering::nextContainer(Container &c) {
 //            }
 //        }
 
+        for (auto &obst : m_obstacles) {
+
+            std::stringstream ss;
+            ss << obst.m_initial_id;
+
+            cv::putText(image, ss.str(),
+                        cv::Point(obst.m_x[0] * zoom + res / 2, obst.m_x[1] * zoom + res / 2),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.33,
+                        cv::Scalar(255, 0, 0));
+
+            cv::circle(image, cv::Point(obst.predicted[0] * zoom + res / 2, obst.predicted[1] * zoom + res / 2), 4, cv::Scalar(0, 255, 255), 2, 8, 0);
+            cv::circle(image, cv::Point(obst.m_x[0] * zoom + res / 2, obst.m_x[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
+            for (int j = 0; j < 4; j++)
+                cv::line(image, cv::Point(obst.m_rectangle[j].x * zoom + res / 2, obst.m_rectangle[j].y * zoom + res / 2),
+                         cv::Point(obst.m_rectangle[(j + 1) % 4].x * zoom + res / 2, obst.m_rectangle[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
+        }
+        //m_obstacles.clear();
+
         for (auto &cluster : clusters) {
-            auto hull = utils::convex_hull(cluster);
+//            auto hull = utils::convex_hull(cluster);
             std::stringstream ss;
             ss << cluster.m_id;
-
-            std::vector<cv::Point2f> vec;
-            for (auto &point : hull) {
-                vec.push_back(cv::Point2f(point->getX(), point->getY()));
-            }
-            if (vec.size() > 2) {
-                auto rect = cv::minAreaRect(vec);
-                cv::Point2f rec[4];
-                rect.points(rec);
-                //cv::rectangle(image, rect, cv::Scalar(255, 0, 255), 1, 8, 0 );
-                for (int j = 0; j < 4; j++)
-                    cv::line(image, cv::Point(rec[j].x * zoom + res / 2, rec[j].y * zoom + res / 2),
-                             cv::Point(rec[(j + 1) % 4].x * zoom + res / 2, rec[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
-            }
+//
+//            std::vector<cv::Point2f> vec;
+//            for (auto &point : hull) {
+//                vec.push_back(cv::Point2f(point->getX(), point->getY()));
+//            }
+//            if (vec.size() > 2) {
+//                auto rect = cv::minAreaRect(vec);
+//                cv::Point2f rec[4];
+//                rect.points(rec);
+//                //cv::rectangle(image, rect, cv::Scalar(255, 0, 255), 1, 8, 0 );
+//                for (int j = 0; j < 4; j++)
+//                    cv::line(image, cv::Point(rec[j].x * zoom + res / 2, rec[j].y * zoom + res / 2),
+//                             cv::Point(rec[(j + 1) % 4].x * zoom + res / 2, rec[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
+//            }
 
             cv::putText(image, ss.str(),
                         cv::Point(cluster.m_center[0] * zoom + res / 2, cluster.m_center[1] * zoom + res / 2),
                         cv::FONT_HERSHEY_SIMPLEX, 0.33,
                         cv::Scalar(255, 255, 255));
-            for (uint32_t i = 1; i < hull.size(); i++) {
-                cv::line(image, cv::Point(hull[i - 1]->getX() * zoom + res / 2, hull[i - 1]->getY() * zoom + res / 2),
-                         cv::Point(hull[i]->getX() * zoom + res / 2, hull[i]->getY() * zoom + res / 2),
-                         cv::Scalar(255, 255, 0), 1, 8, 0);
-            }
-            if (hull.size() > 1)
-                cv::line(image, cv::Point(hull[hull.size() - 1]->getX() * zoom + res / 2,
-                                          hull[hull.size() - 1]->getY() * zoom + res / 2),
-                         cv::Point(hull[0]->getX() * zoom + res / 2, hull[0]->getY() * zoom + res / 2),
-                         cv::Scalar(255, 255, 0), 1, 8, 0);
+//            for (uint32_t i = 1; i < hull.size(); i++) {
+//                cv::line(image, cv::Point(hull[i - 1]->getX() * zoom + res / 2, hull[i - 1]->getY() * zoom + res / 2),
+//                         cv::Point(hull[i]->getX() * zoom + res / 2, hull[i]->getY() * zoom + res / 2),
+//                         cv::Scalar(255, 255, 0), 1, 8, 0);
+//            }
+//            if (hull.size() > 1)
+//                cv::line(image, cv::Point(hull[hull.size() - 1]->getX() * zoom + res / 2,
+//                                          hull[hull.size() - 1]->getY() * zoom + res / 2),
+//                         cv::Point(hull[0]->getX() * zoom + res / 2, hull[0]->getY() * zoom + res / 2),
+//                         cv::Scalar(255, 255, 0), 1, 8, 0);
         }
 
 

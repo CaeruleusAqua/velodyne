@@ -44,23 +44,12 @@ namespace utils {
     }
 
 
-    double cross(const Point *O, const Point *A, const Point *B);
-
-    struct less_than_key
-    {
-        inline bool operator() (const Point *struct1, const Point *struct2)
-        {
-
-            return (struct1->getX() < struct2->getX() || (struct1->getX() == struct2->getX() && struct1->getY() < struct2->getY()));
-        }
-    };
-
 
     std::vector<Point *> minZinSec(int start, int stop, Point (&points)[2000][16]);
 
 
 
-    std::vector<Point*> convex_hull(Cluster P);
+
 }
 
 

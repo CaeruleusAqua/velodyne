@@ -4,12 +4,15 @@
 #include "opendavinci/generated/odcore/data/CompactPointCloud.h"
 #include "opendlv/data/scenario/Scenario.h"
 #include "opendlv/data/environment/WGS84Coordinate.h"
+#include <list>
 #include "Utils.h"
 #include "Point.h"
 #include <iostream>
+#include <random>
 #include <array>
 #include "dbscan.h"
 #include "Cluster.h"
+#include "Obstacle.h"
 #include "Plane.h"
 
 class PointcloudClustering : public odcore::base::module::DataTriggeredConferenceClientModule {
@@ -52,16 +55,24 @@ private:
     virtual void tearDown();
 
     void transform(odcore::data::CompactPointCloud &cpc);
+    void segmentGroundByPlane();
+    void segmentGroundByHeight();
+    void trackObstacles(std::vector<Cluster> &clusters);
 
     Point m_points[2000][16];
     unsigned int m_cloudSize;
     std::vector<Cluster> m_old_clusters;
+    std::list<LidarObstacle> m_obstacles;
 
     opendlv::data::scenario::Scenario *m_scenario;
     opendlv::data::environment::WGS84Coordinate *m_origin;
 
     double m_x, m_y, m_lon, m_lat, m_heading=0;
     Plane m_bestGroundModel;
+
+
+    std::random_device rd;
+    std::mt19937 gen;
 
 //    opendlv::core::sensors::applanix::Grp1Data *m_imu;
 

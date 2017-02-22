@@ -1,12 +1,22 @@
 #include "Obstacle.h"
 #include <math.h>
+#include "Cluster.h"
 
-LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw) {
-    m_x << x, y, theta, y, yaw;
+LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster) {
+    m_x << x, y, theta, v, yaw;
     m_I.setIdentity();
+    m_size = cluster->m_cluster.size();
+    m_center[0] = cluster->m_center[0];
+    m_center[1] = cluster->m_center[1];
+    m_center[2] = cluster->m_center[2];
+    m_rectangle[0] = cluster->m_rectangle[0];
+    m_rectangle[1] = cluster->m_rectangle[1];
+    m_rectangle[2] = cluster->m_rectangle[2];
+    m_rectangle[3] = cluster->m_rectangle[3];
+    m_initial_id = cluster->m_id;
 
     Eigen::Matrix<double, 5, 1> tmp;
-    tmp << 1000,1000,1000,1000,1000;
+    tmp << 1, 1, 10, 1000, 1000;
     m_P = tmp.asDiagonal();
     //m_P << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1;
     double varGPS = 6.0;    // Standard Deviation of GPS Measurement
@@ -56,6 +66,8 @@ void LidarObstacle::predict(double dt) {
                 0.0, 0.0, 0.0, 0.0, 1.0;
     }
 
+    predicted = m_x;
+
 
     double sGPS = 0.5 * 8.8 * dt * dt;  // assume 8.8m/s2 as maximum acceleration, forcing the vehicle
     double sCourse = 0.1 * dt;  // assume 0.1rad/s as maximum turn rate for the vehicle
@@ -97,4 +109,8 @@ void LidarObstacle::update(Eigen::Vector4d Z) {
 
     // Update the error covariance
     m_P = (m_I - (K * JH)) * m_P;
+}
+
+double LidarObstacle::getDistance(Cluster &cluster) {
+    return std::sqrt((cluster.m_center[0] - m_x[0]) * (cluster.m_center[0] - m_x[0]) + (cluster.m_center[1] - m_x[1]) * (cluster.m_center[1] - m_x[1]));
 }
