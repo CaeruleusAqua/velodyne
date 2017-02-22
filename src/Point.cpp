@@ -78,6 +78,16 @@ float Point::get2Distance(Point &a) {
    // return (m_point-a.getVec()).norm();
 }
 
+
+float Point::get2Distance(float x, float y) {
+    float tx = m_point[0] - x;
+    float ty = m_point[1] - y;
+
+    return std::sqrt(tx * tx + ty * ty);
+}
+
+
+
 bool Point::isVisited() {
     return m_visited;
 }

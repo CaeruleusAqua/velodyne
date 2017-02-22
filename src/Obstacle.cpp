@@ -2,115 +2,80 @@
 #include <math.h>
 #include "Cluster.h"
 
-LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster) {
-    m_x << x, y, theta, v, yaw;
-    m_I.setIdentity();
+LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time) {
+    m_latestTimestamp = current_time;
+    m_state << x, y, theta, v, yaw;
     m_size = cluster->m_cluster.size();
-    m_center[0] = cluster->m_center[0];
-    m_center[1] = cluster->m_center[1];
-    m_center[2] = cluster->m_center[2];
+
     m_rectangle[0] = cluster->m_rectangle[0];
     m_rectangle[1] = cluster->m_rectangle[1];
     m_rectangle[2] = cluster->m_rectangle[2];
     m_rectangle[3] = cluster->m_rectangle[3];
     m_initial_id = cluster->m_id;
 
-    Eigen::Matrix<double, 5, 1> tmp;
-    tmp << 1, 1, 10, 1000, 1000;
-    m_P = tmp.asDiagonal();
-    //m_P << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1;
-    double varGPS = 6.0;    // Standard Deviation of GPS Measurement
-    double varspeed = 1.0;  // Variance of the speed measurement
-    double varyaw = 0.1;    // Variance of the yawrate measurement
-    m_R << varGPS * varGPS, 0.0, 0.0, 0.0,
-            0.0, varGPS * varGPS, 0.0, 0.0,
-            0.0, 0.0, varspeed * varspeed, 0.0,
-            0.0, 0.0, 0.0, varyaw * varyaw;
+    m_predicted << 0, 0, 0, 0, 0;
+
 }
 
 
-void LidarObstacle::predict(double dt) {
-    Eigen::MatrixXd JA(5, 5);
-    if (abs(m_x[4]) < 0.0001) {  // Driving straight
-        m_x[0] = m_x[0] + m_x[3] * dt * cos(m_x[2]);
-        m_x[1] = m_x[1] + m_x[3] * dt * sin(m_x[2]);
-        m_x[2] = m_x[2];
-        m_x[3] = m_x[3];
-        m_x[4] = 0.0000001;//  # avoid numerical issues in Jacobians
+void LidarObstacle::predict(odcore::data::TimeStamp current_time) {
+    double dt = static_cast<double>((current_time - m_latestTimestamp).toMicroseconds()) / 1000000.0;
+    //std::cout << "DT: " << dt << std::endl;
+
+    if (abs(m_state[4]) < 0.0001) {  // Driving straight
+        m_predicted[0] = m_state[0] + m_state[3] * dt * cos(m_state[2]);
+        m_predicted[1] = m_state[1] + m_state[3] * dt * sin(m_state[2]);
+        m_predicted[2] = m_state[2];
+        m_predicted[3] = m_state[3];
+        m_predicted[4] = 0.0000001;//  # avoid numerical issues in Jacobians
 
 
-        JA << 1.0, 0.0, 0.0, 0.0, 0.0,
-                0.0, 1.0, 0.0, 0.0, 0.0,
-                0.0, 0.0, 1.0, 0.0, dt,
-                0.0, 0.0, 0.0, 1.0, 0.0,
-                0.0, 0.0, 0.0, 0.0, 1.0;
     } else {
-        m_x[0] = m_x[0] + (m_x[3] / m_x[4]) * (sin(m_x[4] * dt + m_x[2]) - sin(m_x[2]));
-        m_x[1] = m_x[1] + (m_x[3] / m_x[4]) * (-cos(m_x[4] * dt + m_x[2]) + cos(m_x[2]));
-        m_x[2] = fmod((m_x[2] + m_x[4] * dt + M_PI), (2.0 * M_PI)) - M_PI;
-        m_x[3] = m_x[3];
-        m_x[4] = m_x[4];
-        // Calculate the Jacobian of the Dynamic Matrim_x A
-        // see "Calculate the Jacobian of the Dynamic Matrim_x with respect to the state vector"
-        double a13 = (m_x[3] / m_x[4]) * (cos(m_x[4] * dt + m_x[2]) - cos(m_x[2]));
-        double a14 = (1.0 / m_x[4]) * (sin(m_x[4] * dt + m_x[2]) - sin(m_x[2]));
-        double a15 = (dt * m_x[3] / m_x[4]) * cos(m_x[4] * dt + m_x[2]) - (m_x[3] / m_x[4] * m_x[4]) * (sin(m_x[4] * dt + m_x[2]) - sin(m_x[2]));
-        double a23 = (m_x[3] / m_x[4]) * (sin(m_x[4] * dt + m_x[2]) - sin(m_x[2]));
-        double a24 = (1.0 / m_x[4]) * (-cos(m_x[4] * dt + m_x[2]) + cos(m_x[2]));
-        double a25 = (dt * m_x[3] / m_x[4]) * sin(m_x[4] * dt + m_x[2]) - (m_x[3] / m_x[4] * m_x[4]) * (-cos(m_x[4] * dt + m_x[2]) + cos(m_x[2]));
+        m_predicted[0] = m_state[0] + (m_state[3] / m_state[4]) * (sin(m_state[4] * dt + m_state[2]) - sin(m_state[2]));
+        m_predicted[1] = m_state[1] + (m_state[3] / m_state[4]) * (-cos(m_state[4] * dt + m_state[2]) + cos(m_state[2]));
+        m_predicted[2] = fmod((m_state[2] + m_state[4] * dt + M_PI), (2.0 * M_PI)) - M_PI;
+        m_predicted[3] = m_state[3];
+        m_predicted[4] = m_state[4];
 
-        JA << 1.0, 0.0, a13, a14, a15,
-                0.0, 1.0, a23, a24, a25,
-                0.0, 0.0, 1.0, 0.0, dt,
-                0.0, 0.0, 0.0, 1.0, 0.0,
-                0.0, 0.0, 0.0, 0.0, 1.0;
     }
-
-    predicted = m_x;
-
-
-    double sGPS = 0.5 * 8.8 * dt * dt;  // assume 8.8m/s2 as maximum acceleration, forcing the vehicle
-    double sCourse = 0.1 * dt;  // assume 0.1rad/s as maximum turn rate for the vehicle
-    double sVelocity = 8.8 * dt;  // assume 8.8m/s2 as maximum acceleration, forcing the vehicle
-    double sYaw = 1.0 * dt; // assume 1.0rad/s2 as the maximum turn rate acceleration for the vehicle
-
-    Eigen::MatrixXd Q(5, 5);
-    Q << sGPS * sGPS, 0.0, 0.0, 0.0, 0.0,
-            0.0, sGPS * sGPS, 0.0, 0.0, 0.0,
-            0.0, 0.0, sCourse * sCourse, 0.0, 0.0,
-            0.0, 0.0, 0.0, sVelocity * sVelocity, 0.0,
-            0.0, 0.0, 0.0, 0.0, sYaw * sYaw;
-
-
-    // Project the error covariance ahead
-    m_P = JA * m_P * JA.transpose() + Q;
 }
 
-void LidarObstacle::update(Eigen::Vector4d Z) {
-    // Measurement Function
+void LidarObstacle::update(double x, double y, double theta, odcore::data::TimeStamp current_time) {
+    double dt = static_cast<double>((current_time - m_latestTimestamp).toMicroseconds()) / 1000000.0;
+    m_latestTimestamp = current_time;
 
-    Eigen::Vector4d hx;
-    hx << m_x[0], m_x[1], m_x[3], m_x[4];
 
-    Eigen::MatrixXd JH(4, 5);
+    // calculate signed speed by rotating positions into x axis and then take x difference
+    Eigen::Rotation2D<double> rot(-m_state[2]);
+    Eigen::Matrix<double, 2, 1> old_state;
+    old_state << m_state[0], m_state[1];
+    old_state = rot.toRotationMatrix() * old_state;
 
-    JH << 1.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 1.0;
 
-    Eigen::Matrix4d S = JH * m_P * JH.transpose() + m_R;
-    Eigen::Matrix<double, 5, 4> K = (m_P * JH.transpose()) * S.inverse();
+    Eigen::Matrix<double, 2, 1> new_state;
+    new_state << x, y;
+    new_state = rot.toRotationMatrix() * new_state;
 
-    // Update the estimate via
+    double speed = (new_state[0] - old_state[0]) / dt;
 
-    Eigen::Vector4d y = Z - hx;  // Innovation or Residual
-    m_x = m_x + (K * y);
+    double yawrate = (theta - m_state[2]) / dt;
 
-    // Update the error covariance
-    m_P = (m_I - (K * JH)) * m_P;
+
+    m_state[0] = x;
+    m_state[1] = y;
+    m_state[2] = m_state[2] + yawrate * dt;
+
+
+    m_state[3] = speed;
+    m_state[4] = yawrate;
+
+    //std::cout << "DT: " << dt << std::endl;
+    //std::cout << "Speed: " << speed << std::endl;
+
+
 }
 
 double LidarObstacle::getDistance(Cluster &cluster) {
-    return std::sqrt((cluster.m_center[0] - m_x[0]) * (cluster.m_center[0] - m_x[0]) + (cluster.m_center[1] - m_x[1]) * (cluster.m_center[1] - m_x[1]));
+    return std::sqrt(
+            (cluster.m_center[0] - m_predicted[0]) * (cluster.m_center[0] - m_predicted[0]) + (cluster.m_center[1] - m_predicted[1]) * (cluster.m_center[1] - m_predicted[1]));
 }

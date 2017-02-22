@@ -18,12 +18,15 @@ public:
     cv::Point2f m_rectangle[4];
 
     void mean();
+    void meanRect();
 
     double get2Distance(Cluster &a);
 
     double cross(const Point *O, const Point *A, const Point *B);
 
     void calcRectangle();
+
+
 
     std::vector<Point *> getHull();
 

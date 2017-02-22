@@ -47,6 +47,8 @@ public:
 
     float get2Distance(Point &a);
 
+    float get2Distance(float x, float y);
+
     void setIndex(int i, int j);
 
     bool isVisited();

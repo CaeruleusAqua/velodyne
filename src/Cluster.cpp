@@ -28,6 +28,14 @@ void Cluster::mean() {
 
 }
 
+
+void Cluster::meanRect() {
+
+    m_center[0] = (m_rectangle[0].x + m_rectangle[1].x + m_rectangle[2].x + m_rectangle[3].x) / 4;
+    m_center[1] = (m_rectangle[0].y + m_rectangle[1].y + m_rectangle[2].y + m_rectangle[3].y) / 4;
+    m_center[2] = 0;
+}
+
 double Cluster::get2Distance(Cluster &a) {
     float x = m_center[0] - a.m_center[0];
     float y = m_center[1] - a.m_center[1];
