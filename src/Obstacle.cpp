@@ -2,15 +2,16 @@
 #include <math.h>
 #include "Cluster.h"
 
-LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time) {
+LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time, bool isCar) : clusterCandidates() {
     m_latestTimestamp = current_time;
     m_state << x, y, theta, v, yaw;
     m_size = cluster->m_cluster.size();
+    m_isCar = isCar;
 
-    m_rectangle[0] = cluster->m_rectangle[0];
-    m_rectangle[1] = cluster->m_rectangle[1];
-    m_rectangle[2] = cluster->m_rectangle[2];
-    m_rectangle[3] = cluster->m_rectangle[3];
+    m_rectangle[0] = cv::Point2f(cluster->m_rectangle[0]);
+    m_rectangle[1] = cv::Point2f(cluster->m_rectangle[1]);
+    m_rectangle[2] = cv::Point2f(cluster->m_rectangle[2]);
+    m_rectangle[3] = cv::Point2f(cluster->m_rectangle[3]);
     m_initial_id = cluster->m_id;
 
     m_predicted << 0, 0, 0, 0, 0;
@@ -56,7 +57,9 @@ void LidarObstacle::update(double x, double y, double theta, odcore::data::TimeS
     new_state << x, y;
     new_state = rot.toRotationMatrix() * new_state;
 
-    double speed = (new_state[0] - old_state[0]) / dt;
+    double speed_sign = (new_state[0] - old_state[0]);
+    speed_sign = speed_sign / std::abs(speed_sign);
+    double speed = (std::sqrt((new_state[0] - old_state[0]) * (new_state[0] - old_state[0]) + (new_state[1] - old_state[1]) * (new_state[1] - old_state[1])) * speed_sign)/ dt;
 
     double yawrate = (theta - m_state[2]) / dt;
 
@@ -78,4 +81,13 @@ void LidarObstacle::update(double x, double y, double theta, odcore::data::TimeS
 double LidarObstacle::getDistance(Cluster &cluster) {
     return std::sqrt(
             (cluster.m_center[0] - m_predicted[0]) * (cluster.m_center[0] - m_predicted[0]) + (cluster.m_center[1] - m_predicted[1]) * (cluster.m_center[1] - m_predicted[1]));
+}
+
+
+void LidarObstacle::setIsCar(bool isCar) {
+    m_isCar = isCar;
+}
+
+bool LidarObstacle::getIsCar() {
+    return m_isCar;
 }

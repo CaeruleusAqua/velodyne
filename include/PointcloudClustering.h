@@ -56,8 +56,11 @@ private:
     virtual void tearDown();
 
     void transform(odcore::data::CompactPointCloud &cpc);
+
     void segmentGroundByPlane();
+
     void segmentGroundByHeight();
+
     void trackObstacles(std::vector<Cluster> &clusters);
 
     Point m_points[2000][16];
@@ -65,15 +68,15 @@ private:
     std::vector<Cluster> m_old_clusters;
     std::list<LidarObstacle> m_obstacles;
 
-    double m_startAzimuth=0;
-    double m_endAzimuth=0;
+    double m_startAzimuth = 0;
+    double m_endAzimuth = 0;
 
-    std::list<Point*> getAllPointsNextTo(Eigen::Vector2d x,double delta);
+    std::list<Point *> getAllPointsNextTo(Eigen::Vector2d x, double delta);
 
     opendlv::data::scenario::Scenario *m_scenario;
     opendlv::data::environment::WGS84Coordinate *m_origin;
 
-    double m_x, m_y, m_lon, m_lat, m_heading=0;
+    double m_x, m_y, m_lon, m_lat, m_heading = 0;
     Plane m_bestGroundModel;
     odcore::data::TimeStamp m_current_timestamp;
 

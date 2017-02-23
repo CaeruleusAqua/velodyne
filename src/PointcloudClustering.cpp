@@ -1,5 +1,4 @@
 #include "PointcloudClustering.h"
-#include <opencv2/imgproc/imgproc.hpp>
 #include <chrono>
 
 #include "opendlv/scenario/SCNXArchive.h"
@@ -16,12 +15,8 @@
 #include "opendlv/data/planning/Route.h"
 
 #include "opendlv/scenario/LaneVisitor.h"
-#include "Cluster.h"
-
-#include <opendlv/data/environment/WGS84Coordinate.h>
 
 #include "odvdapplanix/GeneratedHeaders_ODVDApplanix.h"
-#include "Obstacle.h"
 
 using namespace std;
 
@@ -37,7 +32,7 @@ using namespace opendlv::data::environment;
 
 PointcloudClustering::PointcloudClustering(const int32_t &argc, char **argv) :
         DataTriggeredConferenceClientModule(argc, argv, "PointcloudClustering"),
-        gen(rd()) {};
+        m_old_clusters(), m_obstacles(), gen(rd()) {};
 
 PointcloudClustering::~PointcloudClustering() {}
 
@@ -86,13 +81,14 @@ std::list<Point *> PointcloudClustering::getAllPointsNextTo(Eigen::Vector2d x, d
     std::list<Point *> points;
     for (int i = index - bound; i < index + bound; i++) {
         int i_mod = i;
-        if (i_mod < 0) {
+        while (i_mod < 0) {
             i_mod += m_cloudSize;
-        } else if (i_mod > static_cast<int32_t>(m_cloudSize) - 1) {
+        }
+        while (i_mod > static_cast<int32_t>(m_cloudSize) - 1) {
             i_mod -= m_cloudSize;
         }
         for (uint32_t offset = 0; offset < 16; offset++) {
-            if (m_points[i_mod][offset].get2Distance(x[0], x[1]) < delta) {
+            if (m_points[i_mod][offset].get2Distance(x[0], x[1]) < delta && !m_points[i_mod][offset].isGround()) {
                 points.push_back(&m_points[i_mod][offset]);
             }
         }
@@ -291,7 +287,7 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
         for (auto &cluster : clusters) {
             if (cluster.getRectLongSite() < 7 && cluster.getRectShortSite() < 3) {
                 //classify Car or pedestrian
-                m_obstacles.push_front(LidarObstacle(cluster.m_center[0], cluster.m_center[1], cluster.getTheta(), 0, 0, &cluster, m_current_timestamp));
+                m_obstacles.push_back(LidarObstacle(cluster.m_center[0], cluster.m_center[1], cluster.getTheta(), 0, 0, &cluster, m_current_timestamp, true));
             }
 
 
@@ -299,8 +295,8 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
     } else {
         //cout << "Repeat tracking Objects... Clusters to track: " << clusters.size() << endl;
         //cout << "Obstacles to track: " << m_obstacles.size() << endl;
-        for (auto &obj : m_obstacles) {
-            obj.predict(m_current_timestamp);
+        for (auto &obst : m_obstacles) {
+            obst.predict(m_current_timestamp);
         }
         double distThreshold = 3.0;
         LidarObstacle *closest_obstacle = nullptr;
@@ -323,28 +319,213 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
 
         }
 
-        for (auto &obst : m_obstacles) {
+
+        std::list<std::_List_iterator<LidarObstacle>> invalid_obstacles;
+
+        for (auto obst = m_obstacles.begin(); obst != m_obstacles.end(); obst++) {
             //cout << "num clusterCandidates: " << obst.clusterCandidates.size() << endl;
 
             double closest_dist = 10000000;
             Cluster *closest_cluster = nullptr;
-            for (auto cluster : obst.clusterCandidates) {
-                double dist = obst.getDistance(*cluster);
+            Cluster newCluster = Cluster();
+            for (auto cluster : obst->clusterCandidates) {
+                double dist = obst->getDistance(*cluster);
                 if (dist < closest_dist) {
                     closest_dist = dist;
                     closest_cluster = cluster;
                 }
             }
+
+
             if (closest_cluster != nullptr) {
-                obst.update(closest_cluster->m_center[0], closest_cluster->m_center[1], closest_cluster->getTheta(), m_current_timestamp);
-                obst.m_rectangle[0] = closest_cluster->m_rectangle[0];
-                obst.m_rectangle[1] = closest_cluster->m_rectangle[1];
-                obst.m_rectangle[2] = closest_cluster->m_rectangle[2];
-                obst.m_rectangle[3] = closest_cluster->m_rectangle[3];
+                Eigen::Vector2d tmp;
+
+                tmp << obst->m_predicted[0], obst->m_predicted[1];
+                if (closest_cluster->getRectLongSite() > obst->m_box_size) {
+                    obst->m_box_size = closest_cluster->getRectLongSite();
+                }
+                std::list<Point *> newPoints = getAllPointsNextTo(tmp, obst->m_box_size);
+                for (auto point : newPoints) {
+                    closest_cluster->m_cluster.push_back(point);
+                }
+                closest_cluster->calcRectangle();
+                if (closest_cluster->getRectLongSite() > 7 || closest_cluster->getRectShortSite() > 3) {
+                    invalid_obstacles.push_back(obst);
+                } else {
+
+
+                    if (closest_cluster->getRectLongSite() < obst->m_box_size) {
+                        //wenn lange seite kuerzer als frueher
+                        //finde punkt am naechsten zum ursprung
+                        double dist0 = cv::norm(closest_cluster->m_rectangle[0]);
+                        double dist1 = cv::norm(closest_cluster->m_rectangle[1]);
+                        double dist2 = cv::norm(closest_cluster->m_rectangle[2]);
+                        double dist3 = cv::norm(closest_cluster->m_rectangle[3]);
+                        double dx = 0, dy = 0, rot = 0;
+                        if (dist0 <= dist1 && dist0 <= dist2 && dist0 <= dist3) {
+                            double lenA = cv::norm(closest_cluster->m_rectangle[0] - closest_cluster->m_rectangle[1]);
+                            double lenB = cv::norm(closest_cluster->m_rectangle[0] - closest_cluster->m_rectangle[3]);
+                            if (lenA <= lenB) { // kurze seite
+                                // make sure taking point with lowest y , i'm unsure that this is enough
+                                if (closest_cluster->m_rectangle[0].y < closest_cluster->m_rectangle[1].y) {
+                                    dx = closest_cluster->m_rectangle[0].x;
+                                    dy = closest_cluster->m_rectangle[0].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[1].y - dy, closest_cluster->m_rectangle[1].x - dx);
+                                } else {
+                                    dx = closest_cluster->m_rectangle[1].x;
+                                    dy = closest_cluster->m_rectangle[1].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[0].y - dy, closest_cluster->m_rectangle[0].x - dx);
+                                }
+                            } else {
+                                // make sure taking point with lowest y , i'm unsure that this is enough
+                                if (closest_cluster->m_rectangle[0].y < closest_cluster->m_rectangle[3].y) {
+                                    dx = closest_cluster->m_rectangle[0].x;
+                                    dy = closest_cluster->m_rectangle[0].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[3].y - dy, closest_cluster->m_rectangle[3].x - dx);
+                                } else {
+                                    dx = closest_cluster->m_rectangle[3].x;
+                                    dy = closest_cluster->m_rectangle[3].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[0].y - dy, closest_cluster->m_rectangle[0].x - dx);
+                                }
+
+                            }
+                        } else if (dist1 <= dist0 && dist1 <= dist2 && dist1 <= dist3) {
+                            double lenA = cv::norm(closest_cluster->m_rectangle[1] - closest_cluster->m_rectangle[0]);
+                            double lenB = cv::norm(closest_cluster->m_rectangle[1] - closest_cluster->m_rectangle[2]);
+                            if (lenA <= lenB) { // kurze seite
+                                // make sure taking point with lowest y , i'm unsure that this is enough
+                                if (closest_cluster->m_rectangle[1].y < closest_cluster->m_rectangle[0].y) {
+                                    dx = closest_cluster->m_rectangle[1].x;
+                                    dy = closest_cluster->m_rectangle[1].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[0].y - dy, closest_cluster->m_rectangle[0].x - dx);
+                                } else {
+                                    dx = closest_cluster->m_rectangle[0].x;
+                                    dy = closest_cluster->m_rectangle[0].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[1].y - dy, closest_cluster->m_rectangle[1].x - dx);
+                                }
+                            } else {
+                                // make sure taking point with lowest y , i'm unsure that this is enough
+                                if (closest_cluster->m_rectangle[1].y < closest_cluster->m_rectangle[2].y) {
+                                    dx = closest_cluster->m_rectangle[1].x;
+                                    dy = closest_cluster->m_rectangle[1].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[2].y - dy, closest_cluster->m_rectangle[2].x - dx);
+                                } else {
+                                    dx = closest_cluster->m_rectangle[2].x;
+                                    dy = closest_cluster->m_rectangle[2].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[1].y - dy, closest_cluster->m_rectangle[1].x - dx);
+                                }
+
+                            }
+                        } else if (dist2 <= dist0 && dist2 <= dist1 && dist2 <= dist3) {
+                            double lenA = cv::norm(closest_cluster->m_rectangle[2] - closest_cluster->m_rectangle[1]);
+                            double lenB = cv::norm(closest_cluster->m_rectangle[2] - closest_cluster->m_rectangle[3]);
+                            if (lenA <= lenB) { // kurze seite
+                                // make sure taking point with lowest y , i'm unsure that this is enough
+                                if (closest_cluster->m_rectangle[2].y < closest_cluster->m_rectangle[1].y) {
+                                    dx = closest_cluster->m_rectangle[2].x;
+                                    dy = closest_cluster->m_rectangle[2].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[1].y - dy, closest_cluster->m_rectangle[1].x - dx);
+                                } else {
+                                    dx = closest_cluster->m_rectangle[1].x;
+                                    dy = closest_cluster->m_rectangle[1].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[2].y - dy, closest_cluster->m_rectangle[2].x - dx);
+                                }
+                            } else {
+                                // make sure taking point with lowest y , i'm unsure that this is enough
+                                if (closest_cluster->m_rectangle[2].y < closest_cluster->m_rectangle[3].y) {
+                                    dx = closest_cluster->m_rectangle[2].x;
+                                    dy = closest_cluster->m_rectangle[2].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[3].y - dy, closest_cluster->m_rectangle[3].x - dx);
+                                } else {
+                                    dx = closest_cluster->m_rectangle[3].x;
+                                    dy = closest_cluster->m_rectangle[3].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[2].y - dy, closest_cluster->m_rectangle[2].x - dx);
+                                }
+
+                            }
+                        } else if (dist3 <= dist0 && dist3 <= dist1 && dist3 <= dist2) {
+                            double lenA = cv::norm(closest_cluster->m_rectangle[3] - closest_cluster->m_rectangle[0]);
+                            double lenB = cv::norm(closest_cluster->m_rectangle[3] - closest_cluster->m_rectangle[2]);
+                            if (lenA <= lenB) { // kurze seite
+                                // make sure taking point with lowest y , i'm unsure that this is enough
+                                if (closest_cluster->m_rectangle[3].y < closest_cluster->m_rectangle[0].y) {
+                                    dx = closest_cluster->m_rectangle[3].x;
+                                    dy = closest_cluster->m_rectangle[3].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[0].y - dy, closest_cluster->m_rectangle[0].x - dx);
+                                } else {
+                                    dx = closest_cluster->m_rectangle[0].x;
+                                    dy = closest_cluster->m_rectangle[0].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[3].y - dy, closest_cluster->m_rectangle[3].x - dx);
+                                }
+                            } else {
+                                // make sure taking point with lowest y , i'm unsure that this is enough
+                                if (closest_cluster->m_rectangle[3].y < closest_cluster->m_rectangle[2].y) {
+                                    dx = closest_cluster->m_rectangle[3].x;
+                                    dy = closest_cluster->m_rectangle[3].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[2].y - dy, closest_cluster->m_rectangle[2].x - dx);
+                                } else {
+                                    dx = closest_cluster->m_rectangle[2].x;
+                                    dy = closest_cluster->m_rectangle[2].y;
+                                    rot = std::atan2(closest_cluster->m_rectangle[3].y - dy, closest_cluster->m_rectangle[3].x - dx);
+                                }
+
+                            }
+
+                        }
+                        //construct new rectangle
+                        Eigen::Rotation2D<double> rotma(rot);
+                        Eigen::Vector2d x1(0, 0);
+                        Eigen::Vector2d x2(closest_cluster->getRectShortSite(), 0);
+                        Eigen::Vector2d x3(closest_cluster->getRectShortSite(), obst->m_box_size);
+                        Eigen::Vector2d x4(0, obst->m_box_size);
+
+                        x1 = rotma.toRotationMatrix() * x1;
+                        x2 = rotma.toRotationMatrix() * x2;
+                        x3 = rotma.toRotationMatrix() * x3;
+                        x4 = rotma.toRotationMatrix() * x4;
+
+                        closest_cluster->m_rectangle[0] = cv::Point2f(x1[0] + dx, x1[1] + dy);
+                        closest_cluster->m_rectangle[1] = cv::Point2f(x2[0] + dx, x2[1] + dy);
+                        closest_cluster->m_rectangle[2] = cv::Point2f(x3[0] + dx, x3[1] + dy);
+                        closest_cluster->m_rectangle[3] = cv::Point2f(x4[0] + dx, x4[1] + dy);
+
+
+                    }
+
+
+                    closest_cluster->meanRect();
+
+                    obst->update(closest_cluster->m_center[0], closest_cluster->m_center[1], -closest_cluster->getTheta(), m_current_timestamp);
+
+
+                    obst->m_rectangle[0] = cv::Point2f(closest_cluster->m_rectangle[0]);
+                    obst->m_rectangle[1] = cv::Point2f(closest_cluster->m_rectangle[1]);
+                    obst->m_rectangle[2] = cv::Point2f(closest_cluster->m_rectangle[2]);
+                    obst->m_rectangle[3] = cv::Point2f(closest_cluster->m_rectangle[3]);
+                }
+
+            }
+
+            if (obst->clusterCandidates.size() == 0) {
+                obst->lostTrackingCounts++;
+            } else {
+                obst->lostTrackingCounts--;
+            }
+            if (obst->lostTrackingCounts > 20) {
+                invalid_obstacles.push_back(obst);
+            }
+            obst->clusterCandidates.clear();
+            if (obst->m_initial_id == 93) {
+                cout << "Roatation: " << obst->m_state[2] / M_PI * 180 << endl;
+                cout << "Speed: " << obst->m_state[3] << endl;
+                cout << "Yawrate: " << obst->m_state[4] / M_PI * 180 << endl;
+                cout << "Rect: :" << obst->m_rectangle[0] << " : " << obst->m_rectangle[1] << " : " << obst->m_rectangle[2] << " : " << obst->m_rectangle[3] << endl;
 
 
             }
-            obst.clusterCandidates.clear();
+        }
+        for (auto &remObst : invalid_obstacles) {
+            m_obstacles.erase(remObst);
         }
 
 
@@ -389,9 +570,6 @@ void PointcloudClustering::nextContainer(Container &c) {
             cluster.calcRectangle();
             cluster.meanRect();
         }
-        Eigen::Vector2d tmpVec;
-        tmpVec << 1, 1;
-        getAllPointsNextTo(tmpVec, 1);
         trackObstacles(clusters);
 
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
