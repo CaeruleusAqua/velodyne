@@ -79,9 +79,9 @@ std::vector<Point *> Cluster::getHull() {
 
 
 void Cluster::calcRectangle() {
-    auto hull = getHull();
+    m_hull = getHull();
     std::vector<cv::Point2f> vec;
-    for (auto &point : hull) {
+    for (auto &point : m_hull) {
         vec.push_back(cv::Point2f(point->getX(), point->getY()));
     }
     if (vec.size() > 2) {

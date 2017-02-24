@@ -12,33 +12,43 @@ class LidarObstacle {
 private:
 
     odcore::data::TimeStamp m_latestTimestamp;
-    bool m_isCar = false;
+    double m_boxLongSite=0;
+    double m_boxShortSite = 0;
+public:
+    double getBoxLongSite() const;
+
+    void setBoxLongSite(double boxLongSite);
+
+    double getBoxShortSite() const;
+
+    void setBoxShortSite(double boxShortSite);
+
+    double getOldBoxLongSite() const;
+
+    void setOldBoxLongSite(double oldBoxLongSite);
+
+    double getOldBoxShortSite() const;
+
+    void setOldBoxShortSite(double oldBoxShortSite);
+
+private:
+    double oldBoxLongSite=0;
+    double oldBoxShortSite=0;
 
 
 public:
-    double m_box_size=0;
-    double old_long_site=0;
-    double old_short_site=0;
+
     int32_t lostTrackingCounts = 0;
     Eigen::Matrix<double, 5, 1> m_state;
     Eigen::Matrix<double, 5, 1> m_predicted;
-
-
-    LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time , bool isCar);
-
-    uint64_t m_initial_id;
-
-    void predict(odcore::data::TimeStamp current_time);
-    void setIsCar(bool isCar);
-    bool getIsCar();
-
-    void update(double x, double y, double theta, odcore::data::TimeStamp current_time);
-
     cv::Point2f m_rectangle[4];
-    unsigned long m_size;
+    uint64_t m_initial_id;
+    std::list<Cluster *> clusterCandidates;
 
 
+    LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time);
+    void predict(odcore::data::TimeStamp current_time);
+    void update(double x, double y, double theta, odcore::data::TimeStamp current_time);
     double getDistance(Cluster &cluster);
 
-    std::list<Cluster *> clusterCandidates;
 };

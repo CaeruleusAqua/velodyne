@@ -70,8 +70,10 @@ private:
 
     double m_startAzimuth = 0;
     double m_endAzimuth = 0;
+    int m_itCount = 100000;
 
     std::list<Point *> getAllPointsNextTo(Eigen::Vector2d x, double delta);
+    std::list<Point *> getAllPointsNextToSlow(Eigen::Vector2d x, double delta);
 
     opendlv::data::scenario::Scenario *m_scenario;
     opendlv::data::environment::WGS84Coordinate *m_origin;

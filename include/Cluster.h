@@ -11,6 +11,9 @@ private:
 public:
     Cluster();
 
+
+    std::vector<Point *> m_hull;
+
     unsigned int m_id;
     double m_center[3];
     bool matched;
