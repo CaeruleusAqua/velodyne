@@ -1,4 +1,5 @@
 #pragma once
+
 #include <vector>
 #include <cstdint>
 #include <cmath>
@@ -11,6 +12,7 @@
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+
 namespace utils {
 
 
@@ -44,10 +46,11 @@ namespace utils {
     }
 
 
-
     std::vector<Point *> minZinSec(int start, int stop, Point (&points)[2000][16]);
 
+    int max(int a, int b);
 
+    int min(int a, int b);
 
 
 }

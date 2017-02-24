@@ -49,7 +49,7 @@ namespace utils {
         static const uint32_t num_of_minima = 14;
         std::vector<Point *> array;
 
-        for (uint32_t i = start; i < start+num_of_minima; i++) {
+        for (uint32_t i = start; i < start + num_of_minima; i++) {
             array.push_back(&(points[0][14]));    // this could be wrong...
         }
 
@@ -99,6 +99,19 @@ namespace utils {
             }
         }
         return array;
+    }
+
+
+    int max(int a, int b) {
+        if (a >= b)
+            return a;
+        return b;
+    }
+
+    int min(int a, int b) {
+        if (a <= b)
+            return a;
+        return b;
     }
 }
 
