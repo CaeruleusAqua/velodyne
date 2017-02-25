@@ -320,8 +320,13 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
         //cout << "Obstacles to track: " << m_obstacles.size() << endl;
         for (auto &obst : m_obstacles) {
             obst.predict(m_current_timestamp);
+            for (auto &cluster : clusters) {
+                if(cluster.m_id == obst.m_initial_id){
+                    obst.clusterCandidates.push_back(&cluster);
+                }
+            }
         }
-        double distThreshold = 2.5;
+        double distThreshold = 1.5;
         LidarObstacle *closest_obstacle = nullptr;
         for (auto &cluster : clusters) {
             double closest_dist = 10000000;
@@ -356,7 +361,7 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
                 newCluster.m_cluster.insert(newCluster.m_cluster.end(), cluster->m_hull.begin(), cluster->m_hull.end());
             }
 
-            Eigen::Vector2d tmp(obst->m_predicted[0], obst->m_predicted[1]);
+            //Eigen::Vector2d tmp(obst->m_predicted[0], obst->m_predicted[1]);
             //cout << "vec: " << tmp << endl;
             //cout << "obst->getBoxLongSite(): " << obst->getBoxLongSite() << endl;
             //std::list<Point *> newPoints = getAllPointsNextToSlow(tmp, obst->getBoxLongSite());
@@ -386,7 +391,7 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
                 } else {
 
 
-                    if (true && newCluster.getRectLongSite() < obst->getBoxLongSite()) {
+                    if (false && newCluster.getRectLongSite() < obst->getBoxLongSite()) {
                         //wenn lange seite kuerzer als frueher
                         //finde punkt am naechsten zum ursprung
                         double dist0 = cv::norm(newCluster.m_rectangle[0]);
