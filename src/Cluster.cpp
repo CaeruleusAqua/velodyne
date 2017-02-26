@@ -80,33 +80,37 @@ double Cluster::cross(const Point *O, const Point *A, const Point *B) {
 // Returns a list of points on the convex hull in counter-clockwise order.
 // Note: the last point in the returned list is the same as the first one.
 std::vector<Point *> Cluster::getHull() {
-    int n = m_cluster.size(), k = 0;
-    std::vector<Point *> H(2 * n);
+    if(m_hull.empty()) {
+        int n = m_cluster.size(), k = 0;
+        std::vector<Point *> H(2 * n);
 
-    // Sort points lexicographically
-    std::sort(m_cluster.begin(), m_cluster.end(), less_than_key());
+        // Sort points lexicographically
+        std::sort(m_cluster.begin(), m_cluster.end(), less_than_key());
 
-    // Build lower hull
-    for (int i = 0; i < n; ++i) {
-        while (k >= 2 && cross(H[k - 2], H[k - 1], m_cluster[i]) <= 0) k--;
-        H[k++] = m_cluster[i];
+        // Build lower hull
+        for (int i = 0; i < n; ++i) {
+            while (k >= 2 && cross(H[k - 2], H[k - 1], m_cluster[i]) <= 0) k--;
+            H[k++] = m_cluster[i];
+        }
+
+        // Build upper hull
+        for (int i = n - 2, t = k + 1; i >= 0; i--) {
+            while (k >= t && cross(H[k - 2], H[k - 1], m_cluster[i]) <= 0) k--;
+            H[k++] = m_cluster[i];
+        }
+
+        H.resize(k - 1);
+        m_hull = H;
+        return H;
     }
-
-    // Build upper hull
-    for (int i = n - 2, t = k + 1; i >= 0; i--) {
-        while (k >= t && cross(H[k - 2], H[k - 1], m_cluster[i]) <= 0) k--;
-        H[k++] = m_cluster[i];
-    }
-
-    H.resize(k - 1);
-    return H;
+    return m_hull;
 }
 
 
 void Cluster::calcRectangle() {
-    m_hull = getHull();
+    auto hull = getHull();
     std::vector<cv::Point2f> vec;
-    for (auto &point : m_hull) {
+    for (auto &point : hull) {
         vec.push_back(cv::Point2f(point->getX(), point->getY()));
     }
     if (vec.size() > 2) {

@@ -1,3 +1,5 @@
+#define VIS
+
 #include "PointcloudClustering.h"
 #include <chrono>
 
@@ -127,8 +129,8 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
     std::string distances = cpc.getDistances();
     m_cloudSize = distances.size() / 2 / 16;
 
-    m_startAzimuth = utils::deg2rad(-cpc.getStartAzimuth() - m_heading );
-    m_endAzimuth = utils::deg2rad(-cpc.getEndAzimuth() - m_heading );
+    m_startAzimuth = utils::deg2rad(-cpc.getStartAzimuth() - m_heading);
+    m_endAzimuth = utils::deg2rad(-cpc.getEndAzimuth() - m_heading);
 
 
     if (m_startAzimuth <= m_endAzimuth) {
@@ -341,9 +343,9 @@ void PointcloudClustering::nextContainer(Container &c) {
         m_x = -cart.getX();
         m_y = cart.getY();
 
-        if(!m_imu_updateted){
-            m_old_x=m_x;
-            m_old_y=m_y;
+        if (!m_imu_updateted) {
+            m_old_x = m_x;
+            m_old_y = m_y;
             m_imu_updateted = true;
         }
 
@@ -367,7 +369,6 @@ void PointcloudClustering::nextContainer(Container &c) {
         m_old_y = m_y;
 
 
-
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         m_current_timestamp = c.getSentTimeStamp();
         CompactPointCloud cpc = c.getData<CompactPointCloud>();
@@ -381,15 +382,11 @@ void PointcloudClustering::nextContainer(Container &c) {
         dbScan.getClusters(clusters);
         for (auto &cluster : clusters) {
             cluster.m_id = m_id_counter++;
-            //cluster.calcRectangle();
             cluster.mean();
         }
-        Eigen::Vector2d test(1, 1);
-        getAllPointsNextTo(test, 1);
         trackObstacles(clusters);
 
-
-        //cout << "--------------------------" << endl << endl;
+#ifdef VIS
 
         const static int res = 1000;
         const static int zoom = 12;
@@ -452,12 +449,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         for (auto &obst : m_obstacles) {
 
 
-
-
-
-
-
-            if (obst.m_initial_id == 93) {
+            if (false || obst.m_initial_id == 93) {
 
                 std::stringstream ss;
                 ss << obst.m_initial_id;
@@ -468,7 +460,7 @@ void PointcloudClustering::nextContainer(Container &c) {
                             cv::Scalar(255, 0, 0));
 
                 std::stringstream ss2;
-                ss2 << obst.m_state[2]/M_PI * 180;
+                ss2 << obst.m_state[2] / M_PI * 180;
                 cv::putText(image, ss2.str(),
                             cv::Point(res - 50 - zoom, res - 20),
                             cv::FONT_HERSHEY_SIMPLEX, 0.33,
@@ -478,6 +470,9 @@ void PointcloudClustering::nextContainer(Container &c) {
                 for (int j = 0; j < 4; j++)
                     cv::line(image, cv::Point(obst.m_rectangle[j].x * zoom + res / 2, obst.m_rectangle[j].y * zoom + res / 2),
                              cv::Point(obst.m_rectangle[(j + 1) % 4].x * zoom + res / 2, obst.m_rectangle[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
+                cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, obst.m_current_mean[1] * zoom + res / 2),
+                                cv::Point(obst.m_movement_vector[0] * zoom + res / 2, obst.m_movement_vector[1] * zoom + res / 2),
+                                cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
 
             }
 
@@ -532,6 +527,7 @@ void PointcloudClustering::nextContainer(Container &c) {
 
 
         cv::waitKey(1);
+#endif
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
 

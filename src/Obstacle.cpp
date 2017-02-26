@@ -2,6 +2,8 @@
 #include <math.h>
 #include <list>
 
+
+
 LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time) : clusterCandidates() {
     m_latestTimestamp = current_time;
     m_state << x, y, theta, v, yaw;
@@ -27,65 +29,130 @@ LidarObstacle::LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_t
 
 }
 
+
 void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::TimeStamp current_time) {
+
+
     if (clusterCandidates.size() > 0) {
-        unsigned int size = -1;
         Eigen::Rotation2D<float> rot(-m_state[2]);
+        std::list<Eigen::Vector2f> points;
+
         for (auto &cluster : clusterCandidates) {
-            size += cluster->getSize();
-        }
-        Eigen::MatrixXf points(2, size + 1);
-        for (auto &cluster : clusterCandidates) {
-            for (auto &point : cluster->m_cluster) {
+            for (auto &point : cluster->getHull()) {
                 Eigen::Vector2f old_point;
                 old_point << point->getX(), point->getY();
-                points.col(size) = rot.toRotationMatrix() * old_point;
-                size--;
-                //std::cout<<"Size: "<<size<<std::endl;
+                points.push_back(rot.toRotationMatrix() * old_point);
             }
         }
-        double min_x = points(0, 0), min_y = points(1, 0);
-        double max_x = points(0, 0), max_y = points(1, 0);
-        for (int i = 0; i < points.cols(); i++) {
-            if (points(0, i) > max_x) {
-                max_x = points(0, i);
-                max_y = points(1, i);
+
+        float min_x = points.front()[0];
+        float max_x = points.back()[0];
+        float min_y = points.front()[1];
+        float max_y = points.front()[1];
+        for (auto &vec : points) {
+            if (vec[1] < min_y)
+                min_y = vec[1];
+            if (vec[1] > max_y)
+                max_y = vec[1];
+            if (vec[0] > max_x)
+                max_x = vec[0];
+            if (vec[0] < min_x)
+                min_x = vec[0];
+        }
+
+        float dxdd = (max_x - min_x) / 3.0f;
+        float x1 = min_x + dxdd;
+        float x2 = min_x + dxdd * 2;
+
+        float p1_x = FLT_MAX;
+        float p1_y = FLT_MAX;
+        float p2_x = FLT_MAX;
+        float p2_y = FLT_MAX;
+
+        for (auto &vec : points) {
+            if (vec[0] < x1) {
+                if (vec[1] < p1_y) {
+                    p1_x = vec[0];
+                    p1_y = vec[1];
+                }
             }
-            if (points(0, i) < min_x) {
-                min_x = points(0, i);
-                min_y = points(1, i);
+            if (vec[0] > x2) {
+                if (vec[1] < p2_y) {
+                    p2_x = vec[0];
+                    p2_y = vec[1];
+                }
+
             }
         }
 
 
+        float thetaCorrection = std::atan2(p2_y-p1_y, p2_x-p1_x);
+        Eigen::Rotation2D<float> rotCorrection(-thetaCorrection);
+
+
+
+
+        for(auto &point : points){
+            point = rotCorrection.toRotationMatrix() * point;
+        }
+
+
+        min_x = points.front()[0];
+        max_x = points.back()[0];
+        min_y = points.front()[1];
+        max_y = points.front()[1];
+        for (auto &vec : points) {
+            if (vec[1] < min_y)
+                min_y = vec[1];
+            if (vec[1] > max_y)
+                max_y = vec[1];
+            if (vec[0] > max_x)
+                max_x = vec[0];
+            if (vec[0] < min_x)
+                min_x = vec[0];
+        }
+
+
+
+        float height = max_y - min_y;
 
         Eigen::Vector2f newPos(max_x, max_y);
-        Eigen::Rotation2D<float> rotBack(m_state[2]);
+        Eigen::Rotation2D<float> rotBack(m_state[2]+thetaCorrection);
         newPos = rotBack.toRotationMatrix() * newPos;
 
 
         Eigen::MatrixXf Rect(2, 4);
-        Rect(0,0)=min_x;
-        Rect(1,0)=min_y;
+        Rect(0, 0) = min_x;
+        Rect(1, 0) = min_y;
 
-        Rect(0,1)=max_x;
-        Rect(1,1)=min_y;
+        Rect(0, 1) = max_x;
+        Rect(1, 1) = min_y;
 
-        Rect(0,2)=max_x;
-        Rect(1,2)=max_y;
+        Rect(0, 2) = max_x;
+        Rect(1, 2) = max_y;
 
-        Rect(0,3)=min_x;
-        Rect(1,3)=max_y;
+        Rect(0, 3) = min_x;
+        Rect(1, 3) = max_y;
 
         Rect = rotBack.toRotationMatrix() * Rect;
 
-        m_rectangle[0] = cv::Point2f(Rect(0,0),Rect(1,0));
-        m_rectangle[1] = cv::Point2f(Rect(0,1),Rect(1,1));
-        m_rectangle[2] = cv::Point2f(Rect(0,2),Rect(1,2));
-        m_rectangle[3] = cv::Point2f(Rect(0,3),Rect(1,3));
+        m_rectangle[0] = cv::Point2f(Rect(0, 0), Rect(1, 0));
+        m_rectangle[1] = cv::Point2f(Rect(0, 1), Rect(1, 1));
+        m_rectangle[2] = cv::Point2f(Rect(0, 2), Rect(1, 2));
+        m_rectangle[3] = cv::Point2f(Rect(0, 3), Rect(1, 3));
 
-        float dx = newPos[0] - m_state[0]+movement_x;
-        float dy = newPos[1] - m_state[1]+movement_y;
+        m_current_mean[0] = (Rect(0, 0) + Rect(0, 1) + Rect(0, 2) + Rect(0, 3)) / 4.0f;
+        m_current_mean[1] = (Rect(1, 0) + Rect(1, 1) + Rect(1, 2) + Rect(1, 3)) / 4.0f;
+
+
+        m_movement_vector[1] = std::sin(m_state[2]) * 2;
+        m_movement_vector[0] = std::cos(m_state[2]) * 2;
+
+
+        m_movement_vector+= m_current_mean;
+
+        float dx = newPos[0] - m_state[0] + movement_x;
+        float dy = newPos[1] - m_state[1] + movement_y;
         if (m_initial_id == 93) {
             std::cout << "Dx: " << dx << std::endl;
             std::cout << "Dy: " << dy << std::endl;
@@ -103,10 +170,9 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
 
             m_state[2] = std::atan2(dy, dx);
-        }
-        else{
-            m_state[0]+=movement_x;
-            m_state[1]+=movement_y;
+        } else {
+            m_state[0] += movement_x;
+            m_state[1] += movement_y;
         }
 
         clusterCandidates.clear();
