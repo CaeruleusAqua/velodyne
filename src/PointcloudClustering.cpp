@@ -64,52 +64,6 @@ void PointcloudClustering::tearDown() {
     cout << "This method is called after the program flow returns from the component's body." << endl;
 }
 
-
-std::list<Point *> PointcloudClustering::getAllPointsNextTo(Eigen::Vector2d x, double delta) {
-    double phi = std::atan2(x[1], x[0]);
-    double r = x.norm() - delta / 2.0;
-    int32_t index = 0;
-    double deltaPhi = std::abs((m_endAzimuth - m_startAzimuth) / static_cast<double>(m_cloudSize));
-
-    index = std::abs(m_startAzimuth - phi) / deltaPhi;
-
-
-    double hyp = std::sqrt((delta / 2.0) * (delta / 2.0) + r * r);
-    int bound = std::acos(r / hyp) / deltaPhi + 1;
-
-
-    //cout<<"Phi: "<< phi/M_PI*180 <<endl;
-    //cout<<"r: "<< r <<endl;
-    //cout<<"deltaPhi: "<< deltaPhi/M_PI*180 <<endl;
-    //cout<<"m_startAzimuth: "<< m_startAzimuth/M_PI*180 <<endl;
-    //cout<<"m_endAzimuth: "<< m_endAzimuth/M_PI*180 <<endl;
-    //cout<<"index: "<< index <<endl;
-    //cout<<"m_cloudSize: "<< m_cloudSize <<endl;
-
-
-    std::list<Point *> points;
-    for (int i = index - bound; i < index + bound; i++) {
-        int i_mod = i;
-        while (i_mod < 0) {
-            i_mod += m_cloudSize;
-        }
-        while (i_mod > static_cast<int32_t>(m_cloudSize) - 1) {
-            i_mod -= m_cloudSize;
-        }
-        for (uint32_t offset = 0; offset < 16; offset++) {
-
-            if ((m_points[i_mod][offset].get2Distance(x[0], x[1]) < delta) && !m_points[i_mod][offset].isGround()) {
-                //cout << "Azimuth: " << m_points[i_mod][offset].getAzimuth()/M_PI*180 << endl;
-                points.push_back(&m_points[i_mod][offset]);
-            }
-        }
-    }
-
-
-    return points;
-
-}
-
 std::list<Point *> PointcloudClustering::getAllPointsNextToSlow(Eigen::Vector2d x, double delta) {
     std::list<Point *> points;
     for (uint32_t i = 0; i < m_cloudSize; i++) {
@@ -129,33 +83,10 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
     std::string distances = cpc.getDistances();
     m_cloudSize = distances.size() / 2 / 16;
 
-    m_startAzimuth = utils::deg2rad(-cpc.getStartAzimuth() - m_heading);
-    m_endAzimuth = utils::deg2rad(-cpc.getEndAzimuth() - m_heading);
+    m_startAzimuth = utils::deg2rad(cpc.getStartAzimuth() + m_heading);
+    m_endAzimuth = utils::deg2rad(cpc.getEndAzimuth() + m_heading);
 
-
-    if (m_startAzimuth <= m_endAzimuth) {
-        if (m_startAzimuth < 0) {
-            int iter = -m_startAzimuth / (M_PI * 2) + 1;
-            if (m_startAzimuth == -M_PI * 2) {
-                iter--;
-            }
-            m_startAzimuth += M_PI * 2 * iter;
-            m_endAzimuth += M_PI * 2 * iter;
-        }
-    } else {
-        if (m_endAzimuth < 0) {
-            int iter = -m_endAzimuth / (M_PI * 2) + 1;
-            if (m_endAzimuth == -M_PI * 2) {
-                iter--;
-            }
-            m_startAzimuth += M_PI * 2 * iter;
-            m_endAzimuth += M_PI * 2 * iter;
-        }
-
-    }
-
-
-    vector<double> azimuth_range = utils::linspace(m_startAzimuth, m_endAzimuth, m_cloudSize);
+    vector<double> azimuth_range = utils::linspace(m_startAzimuth,m_endAzimuth, m_cloudSize);
 
 
     const uint16_t *data = reinterpret_cast<const uint16_t *>(distances.c_str());
@@ -342,7 +273,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         Point3 cart = m_origin->transform(opendlv::data::environment::WGS84Coordinate(imu.getLat(), imu.getLon()));
 
 
-        m_x = -cart.getX();
+        m_x = cart.getX();
         m_y = cart.getY();
 
         if (!m_imu_updateted) {
@@ -429,7 +360,7 @@ void PointcloudClustering::nextContainer(Container &c) {
             for (int j = 0; j < 16; j++) {
                 Point *point = &m_points[i][j];
                 int x = static_cast<int>(point->getX() * zoom) + res / 2;
-                int y = static_cast<int>(point->getY() * zoom) + res / 2;
+                int y = -static_cast<int>(point->getY() * zoom) + res / 2;
                 if ((x < res) && (y < res) && (y >= 0) && (x >= 0)) {
                     // if (point->getMeasurement() > 1 && ( point->getPos()[3] <0  && point->getPos()[3] > -1)) {
                     if (point->isGround()) {
@@ -447,7 +378,7 @@ void PointcloudClustering::nextContainer(Container &c) {
             }
         }
 
-        cv::circle(image, cv::Point((m_x - m_old_x) * zoom + res / 2, (m_y - m_old_y) * zoom + res / 2), 4, cv::Scalar(128, 255, 128), 2, 8, 0);
+        cv::circle(image, cv::Point((m_x - m_old_x) * zoom + res / 2, -(m_y - m_old_y) * zoom + res / 2), 4, cv::Scalar(128, 255, 128), 2, 8, 0);
         for (auto &obst : m_obstacles) {
 
 
@@ -455,10 +386,10 @@ void PointcloudClustering::nextContainer(Container &c) {
             if (obst.m_confidence >= 3) {
 
                 std::stringstream ss;
-                ss << obst.m_initial_id;
+                ss <<obst.m_initial_id;
 
                 cv::putText(image, ss.str(),
-                            cv::Point(obst.m_state[0] * zoom + res / 2, obst.m_state[1] * zoom + res / 2),
+                            cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2),
                             cv::FONT_HERSHEY_SIMPLEX, 0.33,
                             cv::Scalar(255, 0, 0));
 
@@ -468,13 +399,13 @@ void PointcloudClustering::nextContainer(Container &c) {
                             cv::Point(res - 50 - zoom, res - 20),
                             cv::FONT_HERSHEY_SIMPLEX, 0.33,
                             cv::Scalar(255, 255, 255));
-                cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
+                cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
                 //    cv::circle(image, cv::Point(obst.m_predicted[0] * zoom + res / 2, obst.m_predicted[1] * zoom + res / 2), 4, cv::Scalar(0, 255, 255), 2, 8, 0);
                 for (int j = 0; j < 4; j++)
-                    cv::line(image, cv::Point(obst.m_rectangle[j].x * zoom + res / 2, obst.m_rectangle[j].y * zoom + res / 2),
-                             cv::Point(obst.m_rectangle[(j + 1) % 4].x * zoom + res / 2, obst.m_rectangle[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
-                cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, obst.m_current_mean[1] * zoom + res / 2),
-                                cv::Point(obst.m_movement_vector[0] * zoom + res / 2, obst.m_movement_vector[1] * zoom + res / 2),
+                    cv::line(image, cv::Point(obst.m_rectangle[j].x * zoom + res / 2, -obst.m_rectangle[j].y * zoom + res / 2),
+                             cv::Point(obst.m_rectangle[(j + 1) % 4].x * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
+                cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),
+                                cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
                                 cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
 
             }
@@ -503,7 +434,7 @@ void PointcloudClustering::nextContainer(Container &c) {
 //            }
 
             cv::putText(image, ss.str(),
-                        cv::Point(cluster.m_center[0] * zoom + res / 2, cluster.m_center[1] * zoom + res / 2),
+                        cv::Point(cluster.m_center[0] * zoom + res / 2, -cluster.m_center[1] * zoom + res / 2),
                         cv::FONT_HERSHEY_SIMPLEX, 0.33,
                         cv::Scalar(255, 255, 255));
 //            for (uint32_t i = 1; i < hull.size(); i++) {

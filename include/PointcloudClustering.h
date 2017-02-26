@@ -79,7 +79,6 @@ private:
     double m_movement_y=0;
     bool m_imu_updateted = false;
 
-    std::list<Point *> getAllPointsNextTo(Eigen::Vector2d x, double delta);
     std::list<Point *> getAllPointsNextToSlow(Eigen::Vector2d x, double delta);
 
     opendlv::data::scenario::Scenario *m_scenario;
