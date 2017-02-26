@@ -38,11 +38,10 @@ private:
 
 public:
 
-    int32_t lostTrackingCounts = 0;
+    int32_t m_confidence = 0;
 
     Eigen::Vector2f m_movement_vector;
     Eigen::Vector2f m_current_mean;
-
     Eigen::Matrix<double, 5, 1> m_state;
     Eigen::Matrix<double, 5, 1> m_predicted;
     cv::Point2f m_rectangle[4];

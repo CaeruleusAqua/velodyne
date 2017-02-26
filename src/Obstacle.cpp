@@ -31,8 +31,6 @@ LidarObstacle::LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_t
 
 
 void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::TimeStamp current_time) {
-
-
     if (clusterCandidates.size() > 0) {
         Eigen::Rotation2D<float> rot(-m_state[2]);
         std::list<Eigen::Vector2f> points;
@@ -176,6 +174,11 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         }
 
         clusterCandidates.clear();
+        m_confidence++;
+    }
+
+    else{
+        m_confidence-=2;
     }
 
 }

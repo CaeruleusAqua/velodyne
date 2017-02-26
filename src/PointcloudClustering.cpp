@@ -170,9 +170,11 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
             float z = measurement * sin(static_cast<float>(utils::deg2rad(maping[offset])));
             m_points[i / 16][offset] = Point(x, y, z, measurement, azimuth);
             m_points[i / 16][offset].setIndex(i / 16, offset);
-            if (measurement <= 1.8)
+            if (measurement <= 2.5) {
                 m_points[i / 16][offset].setIsGround(true);
-
+                m_points[i / 16][offset].setClustered(true);
+                m_points[i / 16][offset].setVisited(true);
+            }
 
         }
     }
@@ -317,7 +319,7 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
             }
         }
         if (tmp == nullptr) {
-            //m_obstacles.push_back(LidarObstacle(&cluster,m_current_timestamp));
+            m_obstacles.push_back(LidarObstacle(&cluster, m_current_timestamp));
         }
     }
 
@@ -449,7 +451,8 @@ void PointcloudClustering::nextContainer(Container &c) {
         for (auto &obst : m_obstacles) {
 
 
-            if (false || obst.m_initial_id == 93) {
+            //if (false || obst.m_initial_id == 93) {
+            if (obst.m_confidence >= 3) {
 
                 std::stringstream ss;
                 ss << obst.m_initial_id;
