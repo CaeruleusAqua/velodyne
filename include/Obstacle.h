@@ -46,9 +46,11 @@ public:
     std::list<Cluster *> clusterCandidates;
 
 
+    LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_time);
     LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time);
     void predict(odcore::data::TimeStamp current_time);
     void update(double x, double y, double theta, odcore::data::TimeStamp current_time);
+    void refresh(double movement_x, double movement_y, odcore::data::TimeStamp current_time);
     double getDistance(Cluster &cluster);
 
 };

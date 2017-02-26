@@ -1,5 +1,6 @@
 #include "Obstacle.h"
 #include <math.h>
+#include <list>
 
 LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time) : clusterCandidates() {
     m_latestTimestamp = current_time;
@@ -12,6 +13,104 @@ LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double 
     m_initial_id = cluster->m_id;
 
     m_predicted << 0, 0, 0, 0, 0;
+
+}
+
+
+LidarObstacle::LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_time) : clusterCandidates() {
+    m_latestTimestamp = current_time;
+    m_state << cluster->m_center[0], cluster->m_center[1], 0, 0, 0;
+
+    m_initial_id = cluster->m_id;
+
+    m_predicted << 0, 0, 0, 0, 0;
+
+}
+
+void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::TimeStamp current_time) {
+    if (clusterCandidates.size() > 0) {
+        unsigned int size = -1;
+        Eigen::Rotation2D<float> rot(-m_state[2]);
+        for (auto &cluster : clusterCandidates) {
+            size += cluster->getSize();
+        }
+        Eigen::MatrixXf points(2, size + 1);
+        for (auto &cluster : clusterCandidates) {
+            for (auto &point : cluster->m_cluster) {
+                Eigen::Vector2f old_point;
+                old_point << point->getX(), point->getY();
+                points.col(size) = rot.toRotationMatrix() * old_point;
+                size--;
+                //std::cout<<"Size: "<<size<<std::endl;
+            }
+        }
+        double min_x = points(0, 0), min_y = points(1, 0);
+        double max_x = points(0, 0), max_y = points(1, 0);
+        for (int i = 0; i < points.cols(); i++) {
+            if (points(0, i) > max_x) {
+                max_x = points(0, i);
+                max_y = points(1, i);
+            }
+            if (points(0, i) < min_x) {
+                min_x = points(0, i);
+                min_y = points(1, i);
+            }
+        }
+
+
+
+        Eigen::Vector2f newPos(max_x, max_y);
+        Eigen::Rotation2D<float> rotBack(m_state[2]);
+        newPos = rotBack.toRotationMatrix() * newPos;
+
+
+        Eigen::MatrixXf Rect(2, 4);
+        Rect(0,0)=min_x;
+        Rect(1,0)=min_y;
+
+        Rect(0,1)=max_x;
+        Rect(1,1)=min_y;
+
+        Rect(0,2)=max_x;
+        Rect(1,2)=max_y;
+
+        Rect(0,3)=min_x;
+        Rect(1,3)=max_y;
+
+        Rect = rotBack.toRotationMatrix() * Rect;
+
+        m_rectangle[0] = cv::Point2f(Rect(0,0),Rect(1,0));
+        m_rectangle[1] = cv::Point2f(Rect(0,1),Rect(1,1));
+        m_rectangle[2] = cv::Point2f(Rect(0,2),Rect(1,2));
+        m_rectangle[3] = cv::Point2f(Rect(0,3),Rect(1,3));
+
+        float dx = newPos[0] - m_state[0]+movement_x;
+        float dy = newPos[1] - m_state[1]+movement_y;
+        if (m_initial_id == 93) {
+            std::cout << "Dx: " << dx << std::endl;
+            std::cout << "Dy: " << dy << std::endl;
+            std::cout << "movement_x: " << movement_x << std::endl;
+            std::cout << "movement_y: " << movement_y << std::endl;
+            std::cout << "Theta: " << m_state[2] / M_PI * 180 << std::endl;
+        }
+
+
+        float movement = std::sqrt((m_state[0] - newPos[0]) * (m_state[0] - newPos[0]) + (m_state[1] - newPos[1]) * (m_state[1] - newPos[1]));
+        //movement =0;
+        if (movement > 2) {
+            m_state[0] = newPos[0];
+            m_state[1] = newPos[1];
+
+
+            m_state[2] = std::atan2(dy, dx);
+        }
+        else{
+            m_state[0]+=movement_x;
+            m_state[1]+=movement_y;
+        }
+
+        clusterCandidates.clear();
+    }
 
 }
 
@@ -56,7 +155,7 @@ void LidarObstacle::update(double x, double y, double theta, odcore::data::TimeS
 
     double speed_sign = (new_state[0] - old_state[0]);
     speed_sign = speed_sign / std::abs(speed_sign);
-    double speed = (std::sqrt((new_state[0] - old_state[0]) * (new_state[0] - old_state[0]) + (new_state[1] - old_state[1]) * (new_state[1] - old_state[1])) * speed_sign)/ dt;
+    double speed = (std::sqrt((new_state[0] - old_state[0]) * (new_state[0] - old_state[0]) + (new_state[1] - old_state[1]) * (new_state[1] - old_state[1])) * speed_sign) / dt;
 
     double yawrate = (theta - m_state[2]) / dt;
 

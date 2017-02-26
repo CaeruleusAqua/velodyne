@@ -5,13 +5,13 @@
 #include "Utils.h"
 
 
-Cluster::Cluster():m_cluster() {
+Cluster::Cluster() : m_cluster() {
     m_center[0] = 0;
     m_center[1] = 0;
     m_center[2] = 0;;
     m_id = 0;
     matched = false;
-    assigned= false;
+    assigned = false;
 }
 
 void Cluster::mean() {
@@ -41,6 +41,31 @@ double Cluster::get2Distance(Cluster &a) {
     float x = m_center[0] - a.m_center[0];
     float y = m_center[1] - a.m_center[1];
     return std::sqrt(x * x + y * y);
+}
+
+
+double Cluster::get2Distance(double x, double y) {
+    float xx = m_center[0] - x;
+    float yy = m_center[1] - y;
+    return std::sqrt(xx * xx + yy * yy);
+}
+
+
+Point *Cluster::getMinDistPoint(double x, double y) {
+    unsigned int min_dist = 200;
+    Point *tmp = nullptr;
+    for (auto &point : m_cluster) {
+        unsigned int dist = point->get2Distance(x, y);
+        if (dist < min_dist) {
+            tmp = point;
+            min_dist = dist;
+        }
+    }
+    return tmp;
+}
+
+unsigned int Cluster::getSize() {
+    return m_cluster.size();
 }
 
 

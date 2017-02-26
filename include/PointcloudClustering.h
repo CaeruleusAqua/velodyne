@@ -72,13 +72,20 @@ private:
     double m_endAzimuth = 0;
     int m_itCount = 100000;
 
+    double m_x, m_y, m_lon, m_lat, m_heading = 0;
+    double m_old_x = 0;
+    double m_old_y = 0;
+    double m_movement_x=0;
+    double m_movement_y=0;
+    bool m_imu_updateted = false;
+
     std::list<Point *> getAllPointsNextTo(Eigen::Vector2d x, double delta);
     std::list<Point *> getAllPointsNextToSlow(Eigen::Vector2d x, double delta);
 
     opendlv::data::scenario::Scenario *m_scenario;
     opendlv::data::environment::WGS84Coordinate *m_origin;
 
-    double m_x, m_y, m_lon, m_lat, m_heading = 0;
+
     Plane m_bestGroundModel;
     odcore::data::TimeStamp m_current_timestamp;
 

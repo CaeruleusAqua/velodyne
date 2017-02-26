@@ -25,6 +25,12 @@ public:
     void meanRect();
 
     double get2Distance(Cluster &a);
+    double get2Distance(double x ,double y);
+    unsigned int getSize();
+
+    Point* getMinDistPoint(double x ,double y);
+
+
 
     double cross(const Point *O, const Point *A, const Point *B);
 
