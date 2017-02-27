@@ -402,8 +402,8 @@ void PointcloudClustering::nextContainer(Container &c) {
                 cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
                 //    cv::circle(image, cv::Point(obst.m_predicted[0] * zoom + res / 2, obst.m_predicted[1] * zoom + res / 2), 4, cv::Scalar(0, 255, 255), 2, 8, 0);
                 for (int j = 0; j < 4; j++)
-                    cv::line(image, cv::Point(obst.m_rectangle[j].x * zoom + res / 2, -obst.m_rectangle[j].y * zoom + res / 2),
-                             cv::Point(obst.m_rectangle[(j + 1) % 4].x * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
+                    cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                             cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
 
                 if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
                     cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),

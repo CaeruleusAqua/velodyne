@@ -3,7 +3,6 @@
 #include <list>
 
 
-
 LidarObstacle::LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_time) : clusterCandidates() {
     m_latestTimestamp = current_time;
     m_state << cluster->m_center[0], cluster->m_center[1], 0, 0, 0;
@@ -123,6 +122,7 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
         Eigen::Vector2f newPos(max_x, max_y);
         Eigen::Rotation2D<float> rotBack(m_state[2] + thetaCorrection);
+        m_rectRot = m_state[2] + thetaCorrection;
         newPos = rotBack.toRotationMatrix() * newPos;
 
 
@@ -141,10 +141,10 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
         Rect = rotBack.toRotationMatrix() * Rect;
 
-        m_rectangle[0] = cv::Point2f(Rect(0, 0), Rect(1, 0));
-        m_rectangle[1] = cv::Point2f(Rect(0, 1), Rect(1, 1));
-        m_rectangle[2] = cv::Point2f(Rect(0, 2), Rect(1, 2));
-        m_rectangle[3] = cv::Point2f(Rect(0, 3), Rect(1, 3));
+        m_rectangle[0] = Eigen::Vector2f(Rect(0, 0), Rect(1, 0));
+        m_rectangle[1] = Eigen::Vector2f(Rect(0, 1), Rect(1, 1));
+        m_rectangle[2] = Eigen::Vector2f(Rect(0, 2), Rect(1, 2));
+        m_rectangle[3] = Eigen::Vector2f(Rect(0, 3), Rect(1, 3));
 
         m_current_mean[0] = (Rect(0, 0) + Rect(0, 1) + Rect(0, 2) + Rect(0, 3)) / 4.0f;
         m_current_mean[1] = (Rect(1, 0) + Rect(1, 1) + Rect(1, 2) + Rect(1, 3)) / 4.0f;
@@ -224,5 +224,19 @@ double LidarObstacle::getOldBoxShortSite() const {
 
 void LidarObstacle::setOldBoxShortSite(double oldBoxShortSite) {
     LidarObstacle::oldBoxShortSite = oldBoxShortSite;
+}
+
+bool LidarObstacle::isInRect(Point &point) {
+    Eigen::Rotation2D<float> rotCorrection(-m_rectRot);
+    Eigen::Vector2f rrect[4];
+    for(int i=0;i<4;i++){
+        rrect[i]=rotCorrection.toRotationMatrix() * m_rectangle[i];
+    }
+
+//
+//    for (auto &point : points) {
+//        point = rotCorrection.toRotationMatrix() * point;
+//    }
+
 }
 

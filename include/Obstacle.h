@@ -17,6 +17,7 @@ private:
     double oldBoxLongSite=0;
     double oldBoxShortSite=0;
 
+
 public:
     double getBoxLongSite() const;
 
@@ -34,14 +35,17 @@ public:
 
     void setOldBoxShortSite(double oldBoxShortSite);
 
+    bool isInRect(Point &point);
+
 
     int32_t m_confidence = 0;
+    double m_rectRot=0;
 
     Eigen::Vector2f m_movement_vector;
     Eigen::Vector2f m_current_mean;
     Eigen::Matrix<double, 5, 1> m_state;
     Eigen::Matrix<double, 5, 1> m_predicted;
-    cv::Point2f m_rectangle[4];
+    Eigen::Vector2f m_rectangle[4];
     uint64_t m_initial_id;
     std::list<Cluster *> clusterCandidates;
 
