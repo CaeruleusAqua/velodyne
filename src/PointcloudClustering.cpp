@@ -86,7 +86,7 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
     m_startAzimuth = utils::deg2rad(cpc.getStartAzimuth() + m_heading);
     m_endAzimuth = utils::deg2rad(cpc.getEndAzimuth() + m_heading);
 
-    vector<double> azimuth_range = utils::linspace(m_startAzimuth,m_endAzimuth, m_cloudSize);
+    vector<double> azimuth_range = utils::linspace(m_startAzimuth, m_endAzimuth, m_cloudSize);
 
 
     const uint16_t *data = reinterpret_cast<const uint16_t *>(distances.c_str());
@@ -386,7 +386,7 @@ void PointcloudClustering::nextContainer(Container &c) {
             if (obst.m_confidence >= 3) {
 
                 std::stringstream ss;
-                ss <<obst.m_initial_id;
+                ss << obst.m_initial_id;
 
                 cv::putText(image, ss.str(),
                             cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2),
@@ -404,9 +404,11 @@ void PointcloudClustering::nextContainer(Container &c) {
                 for (int j = 0; j < 4; j++)
                     cv::line(image, cv::Point(obst.m_rectangle[j].x * zoom + res / 2, -obst.m_rectangle[j].y * zoom + res / 2),
                              cv::Point(obst.m_rectangle[(j + 1) % 4].x * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
-                cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),
-                                cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
-                                cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
+
+                if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
+                    cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),
+                                    cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
+                                    cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
 
             }
 

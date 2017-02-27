@@ -4,21 +4,6 @@
 
 
 
-LidarObstacle::LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time) : clusterCandidates() {
-    m_latestTimestamp = current_time;
-    m_state << x, y, theta, v, yaw;
-
-    m_rectangle[0] = cv::Point2f(cluster->m_rectangle[0]);
-    m_rectangle[1] = cv::Point2f(cluster->m_rectangle[1]);
-    m_rectangle[2] = cv::Point2f(cluster->m_rectangle[2]);
-    m_rectangle[3] = cv::Point2f(cluster->m_rectangle[3]);
-    m_initial_id = cluster->m_id;
-
-    m_predicted << 0, 0, 0, 0, 0;
-
-}
-
-
 LidarObstacle::LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_time) : clusterCandidates() {
     m_latestTimestamp = current_time;
     m_state << cluster->m_center[0], cluster->m_center[1], 0, 0, 0;
@@ -62,35 +47,60 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         float x1 = min_x + dxdd;
         float x2 = min_x + dxdd * 2;
 
-        float p1_x = FLT_MAX;
-        float p1_y = FLT_MAX;
-        float p2_x = FLT_MAX;
-        float p2_y = FLT_MAX;
 
-        for (auto &vec : points) {
-            if (vec[0] < x1) {
-                if (vec[1] < p1_y) {
-                    p1_x = vec[0];
-                    p1_y = vec[1];
+        float p1_x, p1_y, p2_x, p2_y;
+        if ((min_y + max_y) / 2 > 0) {
+            // minimize y if are above the origin
+
+            p1_x = FLT_MAX;
+            p1_y = FLT_MAX;
+            p2_x = FLT_MAX;
+            p2_y = FLT_MAX;
+
+            for (auto &vec : points) {
+                if (vec[0] < x1) {
+                    if (vec[1] < p1_y) {
+                        p1_x = vec[0];
+                        p1_y = vec[1];
+                    }
+                }
+                if (vec[0] > x2) {
+                    if (vec[1] < p2_y) {
+                        p2_x = vec[0];
+                        p2_y = vec[1];
+                    }
+
                 }
             }
-            if (vec[0] > x2) {
-                if (vec[1] < p2_y) {
-                    p2_x = vec[0];
-                    p2_y = vec[1];
-                }
+        } else {
+            // maximize y if are under the origin
+            p1_x = FLT_MIN;
+            p1_y = FLT_MIN;
+            p2_x = FLT_MIN;
+            p2_y = FLT_MIN;
 
+            for (auto &vec : points) {
+                if (vec[0] < x1) {
+                    if (vec[1] > p1_y) {
+                        p1_x = vec[0];
+                        p1_y = vec[1];
+                    }
+                }
+                if (vec[0] > x2) {
+                    if (vec[1] > p2_y) {
+                        p2_x = vec[0];
+                        p2_y = vec[1];
+                    }
+
+                }
             }
+
         }
 
 
-        float thetaCorrection = std::atan2(p2_y-p1_y, p2_x-p1_x);
+        float thetaCorrection = std::atan2(p2_y - p1_y, p2_x - p1_x);
         Eigen::Rotation2D<float> rotCorrection(-thetaCorrection);
-
-
-
-
-        for(auto &point : points){
+        for (auto &point : points) {
             point = rotCorrection.toRotationMatrix() * point;
         }
 
@@ -111,11 +121,8 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         }
 
 
-
-        float height = max_y - min_y;
-
         Eigen::Vector2f newPos(max_x, max_y);
-        Eigen::Rotation2D<float> rotBack(m_state[2]+thetaCorrection);
+        Eigen::Rotation2D<float> rotBack(m_state[2] + thetaCorrection);
         newPos = rotBack.toRotationMatrix() * newPos;
 
 
@@ -147,7 +154,7 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         m_movement_vector[0] = std::cos(m_state[2]) * 2;
 
 
-        m_movement_vector+= m_current_mean;
+        m_movement_vector += m_current_mean;
 
         float dx = newPos[0] - m_state[0] + movement_x;
         float dy = newPos[1] - m_state[1] + movement_y;
@@ -175,73 +182,12 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
         clusterCandidates.clear();
         m_confidence++;
-    }
-
-    else{
-        m_confidence-=2;
-    }
-
-}
-
-
-void LidarObstacle::predict(odcore::data::TimeStamp current_time) {
-    double dt = static_cast<double>((current_time - m_latestTimestamp).toMicroseconds()) / 1000000.0;
-    //std::cout << "DT: " << dt << std::endl;
-
-    if (abs(m_state[4]) < 0.0001) {  // Driving straight
-        m_predicted[0] = m_state[0] + m_state[3] * dt * cos(m_state[2]);
-        m_predicted[1] = m_state[1] + m_state[3] * dt * sin(m_state[2]);
-        m_predicted[2] = m_state[2];
-        m_predicted[3] = m_state[3];
-        m_predicted[4] = 0.0000001;//  # avoid numerical issues in Jacobians
-
-
     } else {
-        m_predicted[0] = m_state[0] + (m_state[3] / m_state[4]) * (sin(m_state[4] * dt + m_state[2]) - sin(m_state[2]));
-        m_predicted[1] = m_state[1] + (m_state[3] / m_state[4]) * (-cos(m_state[4] * dt + m_state[2]) + cos(m_state[2]));
-        m_predicted[2] = fmod((m_state[2] + m_state[4] * dt + M_PI), (2.0 * M_PI)) - M_PI;
-        m_predicted[3] = m_state[3];
-        m_predicted[4] = m_state[4];
-
+        m_confidence -= 2;
     }
-}
-
-void LidarObstacle::update(double x, double y, double theta, odcore::data::TimeStamp current_time) {
-    double dt = static_cast<double>((current_time - m_latestTimestamp).toMicroseconds()) / 1000000.0;
-    m_latestTimestamp = current_time;
-
-
-    // calculate signed speed by rotating positions into x axis and then take x difference
-    Eigen::Rotation2D<double> rot(-m_state[2]);
-    Eigen::Matrix<double, 2, 1> old_state;
-    old_state << m_state[0], m_state[1];
-    old_state = rot.toRotationMatrix() * old_state;
-
-
-    Eigen::Matrix<double, 2, 1> new_state;
-    new_state << x, y;
-    new_state = rot.toRotationMatrix() * new_state;
-
-    double speed_sign = (new_state[0] - old_state[0]);
-    speed_sign = speed_sign / std::abs(speed_sign);
-    double speed = (std::sqrt((new_state[0] - old_state[0]) * (new_state[0] - old_state[0]) + (new_state[1] - old_state[1]) * (new_state[1] - old_state[1])) * speed_sign) / dt;
-
-    double yawrate = (theta - m_state[2]) / dt;
-
-
-    m_state[0] = x;
-    m_state[1] = y;
-    m_state[2] = m_state[2] + yawrate * dt;
-
-
-    m_state[3] = speed;
-    m_state[4] = yawrate;
-
-    //std::cout << "DT: " << dt << std::endl;
-    //std::cout << "Speed: " << speed << std::endl;
-
 
 }
+
 
 double LidarObstacle::getDistance(Cluster &cluster) {
     return std::sqrt(

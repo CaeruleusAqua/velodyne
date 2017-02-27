@@ -14,6 +14,9 @@ private:
     odcore::data::TimeStamp m_latestTimestamp;
     double m_boxLongSite=0;
     double m_boxShortSite = 0;
+    double oldBoxLongSite=0;
+    double oldBoxShortSite=0;
+
 public:
     double getBoxLongSite() const;
 
@@ -31,12 +34,6 @@ public:
 
     void setOldBoxShortSite(double oldBoxShortSite);
 
-private:
-    double oldBoxLongSite=0;
-    double oldBoxShortSite=0;
-
-
-public:
 
     int32_t m_confidence = 0;
 
@@ -50,9 +47,6 @@ public:
 
 
     LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_time);
-    LidarObstacle(double x, double y, double theta, double v, double yaw, Cluster *cluster, odcore::data::TimeStamp current_time);
-    void predict(odcore::data::TimeStamp current_time);
-    void update(double x, double y, double theta, odcore::data::TimeStamp current_time);
     void refresh(double movement_x, double movement_y, odcore::data::TimeStamp current_time);
     double getDistance(Cluster &cluster);
 
