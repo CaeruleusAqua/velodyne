@@ -255,7 +255,7 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
     }
 
     for (auto &obst : m_obstacles) {
-        obst.refresh(m_movement_x, m_movement_y, m_current_timestamp);
+        obst.refresh(m_movement_x, m_movement_y, m_current_timestamp, m_itCount);
     }
 
 
@@ -459,7 +459,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         cv::imshow("Lidar", image);
         stringstream ss;
         ss << "../images/img" << m_itCount++ << ".png";
-        cv::imwrite(ss.str(), image);
+        //cv::imwrite(ss.str(), image);
 
 
         cv::waitKey(1);
