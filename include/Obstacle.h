@@ -14,6 +14,30 @@ private:
     odcore::data::TimeStamp m_latestTimestamp;
     std::list<std::array<int,2>> m_width;
     std::list<std::array<int,2>> m_length;
+    std::list<std::array<int,2>> m_type;
+
+    float getMostPropType(int type){
+        bool found = false;
+        for( auto &pair : m_type){
+            if(pair[0]==type){
+                pair[1]++;
+                found = true;
+            }
+        }
+        if(!found){
+            std::array<int,2> newSize = {type,1};
+            m_type.push_back(newSize);
+        }
+        int max_prop = 0;
+        double retval = 0;
+        for( auto &pair : m_type){
+            if(pair[1]>max_prop){
+                max_prop=pair[1];
+                retval = pair[0];
+            }
+        }
+        return retval;
+    }
 
     float getMostPropWidth(float width){
         int mapped = (width*2)+1;
@@ -75,6 +99,8 @@ public:
     double m_speed_y = 10000;
     float m_best_width = 0;
     float m_best_length = 0;
+    // 0 -unclassified ; 1 - Car ; 2 cycelist ; 3 - pedestrian
+    int m_best_type=0;
 
     Eigen::Vector2f m_movement_vector;
     Eigen::Vector2f m_current_mean;

@@ -122,19 +122,19 @@ void PointcloudClustering::segmentGroundByPlane() {
 //    }
 
 
-    std::vector<Point *> tmp = utils::minZinSec(sector_size * 0 + sector_size/2, sector_size * (0 + 1) +sector_size /2, m_points);
+    std::vector<Point *> tmp = utils::minZinSec(sector_size * 0 + sector_size / 2, sector_size * (0 + 1) + sector_size / 2, m_points);
     minis.insert(minis.end(), tmp.begin(), tmp.end());
-    tmp = utils::minZinSec(sector_size * 12 + sector_size/2 , sector_size * (12 + 1) + sector_size/2, m_points);
+    tmp = utils::minZinSec(sector_size * 12 + sector_size / 2, sector_size * (12 + 1) + sector_size / 2, m_points);
     minis.insert(minis.end(), tmp.begin(), tmp.end());
-    tmp = utils::minZinSec(sector_size * 14 + sector_size/2, sector_size * (14 + 1) + sector_size/2 , m_points);
+    tmp = utils::minZinSec(sector_size * 14 + sector_size / 2, sector_size * (14 + 1) + sector_size / 2, m_points);
     minis.insert(minis.end(), tmp.begin(), tmp.end());
-    tmp = utils::minZinSec(sector_size * 28 + sector_size/2, sector_size * (28 + 1) + sector_size/2, m_points);
+    tmp = utils::minZinSec(sector_size * 28 + sector_size / 2, sector_size * (28 + 1) + sector_size / 2, m_points);
     minis.insert(minis.end(), tmp.begin(), tmp.end());
 
     // RANSAC
     double besterror = 100000000;
 
-    std::uniform_int_distribution<> dis(0, ((minis.size() - 1) ));
+    std::uniform_int_distribution<> dis(0, ((minis.size() - 1)));
 
     for (int probes = 0; probes < 50; probes++) {
         std::vector<Point *> maybeinliers;
@@ -385,48 +385,68 @@ void PointcloudClustering::nextContainer(Container &c) {
             }
         }
 
-        cv::circle(image, cv::Point((m_x - m_old_x) * zoom + res / 2, -(m_y - m_old_y) * zoom + res / 2), 4, cv::Scalar(128, 255, 128), 2, 8, 0);
-        for (auto &obst : m_obstacles) {
+
+        if(false) {
+            cv::circle(image, cv::Point((m_x - m_old_x) * zoom + res / 2, -(m_y - m_old_y) * zoom + res / 2), 4, cv::Scalar(128, 255, 128), 2, 8, 0);
+            for (auto &obst : m_obstacles) {
 
 
-            //if (false || obst.m_initial_id == 93) {
-            if (obst.m_confidence >= 3) {
+                //if (false || obst.m_initial_id == 93) {
+                if (obst.m_confidence >= 3) {
 
-                std::stringstream ss;
-                ss << obst.m_initial_id;
+                    std::stringstream ss;
+                    ss << obst.m_initial_id;
 
-                cv::putText(image, ss.str(),
-                            cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2),
-                            cv::FONT_HERSHEY_SIMPLEX, 0.33,
-                            cv::Scalar(255, 0, 0));
+                    cv::putText(image, ss.str(),
+                                cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2),
+                                cv::FONT_HERSHEY_SIMPLEX, 0.33,
+                                cv::Scalar(255, 0, 0));
 
-                std::stringstream ss2;
-                ss2 << obst.m_state[2] / M_PI * 180;
-                cv::putText(image, ss2.str(),
-                            cv::Point(res - 50 - zoom, res - 20),
-                            cv::FONT_HERSHEY_SIMPLEX, 0.33,
-                            cv::Scalar(255, 255, 255));
-                cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
-                //    cv::circle(image, cv::Point(obst.m_predicted[0] * zoom + res / 2, obst.m_predicted[1] * zoom + res / 2), 4, cv::Scalar(0, 255, 255), 2, 8, 0);
-                for (int j = 0; j < 4; j++)
-                    cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
-                             cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
+                    std::stringstream ss2;
+                    ss2 << obst.m_state[2] / M_PI * 180;
+                    cv::putText(image, ss2.str(),
+                                cv::Point(res - 50 - zoom, res - 20),
+                                cv::FONT_HERSHEY_SIMPLEX, 0.33,
+                                cv::Scalar(255, 255, 255));
+                    cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
+                    //    cv::circle(image, cv::Point(obst.m_predicted[0] * zoom + res / 2, obst.m_predicted[1] * zoom + res / 2), 4, cv::Scalar(0, 255, 255), 2, 8, 0);
+                    std::cout << "Type: " << obst.m_best_type << std::endl;
+                    if (obst.m_best_type == 0)
+                        for (int j = 0; j < 4; j++)
+                            cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                     cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 255, 255), 1,
+                                     8);
+                    else if (obst.m_best_type == 1)
+                        for (int j = 0; j < 4; j++)
+                            cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                     cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 0, 255), 1,
+                                     8);
+                    else if (obst.m_best_type == 2)
+                        for (int j = 0; j < 4; j++)
+                            cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                     cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(0, 255, 255), 1,
+                                     8);
+                    else if (obst.m_best_type == 3)
+                        for (int j = 0; j < 4; j++)
+                            cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                     cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 255, 0), 1,
+                                     8);
 
-                if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
-                    cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),
-                                    cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
-                                    cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
+                    if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
+                        cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),
+                                        cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
+                                        cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
+
+                }
 
             }
+            //m_obstacles.clear();
 
-        }
-        //m_obstacles.clear();
-
-        for (auto &cluster : clusters) {
+            for (auto &cluster : clusters) {
 //            auto hull = utils::convex_hull(cluster);
-            std::stringstream ss;
-            ss << cluster.m_id;
-            //cv::circle(image, cv::Point(cluster.m_center[0] * zoom + res / 2, cluster.m_center[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
+                std::stringstream ss;
+                ss << cluster.m_id;
+                //cv::circle(image, cv::Point(cluster.m_center[0] * zoom + res / 2, cluster.m_center[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
 //
 //            std::vector<cv::Point2f> vec;
 //            for (auto &point : hull) {
@@ -442,10 +462,10 @@ void PointcloudClustering::nextContainer(Container &c) {
 //                             cv::Point(rec[(j + 1) % 4].x * zoom + res / 2, rec[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
 //            }
 
-            cv::putText(image, ss.str(),
-                        cv::Point(cluster.m_center[0] * zoom + res / 2, -cluster.m_center[1] * zoom + res / 2),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.33,
-                        cv::Scalar(255, 255, 255));
+                cv::putText(image, ss.str(),
+                            cv::Point(cluster.m_center[0] * zoom + res / 2, -cluster.m_center[1] * zoom + res / 2),
+                            cv::FONT_HERSHEY_SIMPLEX, 0.33,
+                            cv::Scalar(255, 255, 255));
 //            for (uint32_t i = 1; i < hull.size(); i++) {
 //                cv::line(image, cv::Point(hull[i - 1]->getX() * zoom + res / 2, hull[i - 1]->getY() * zoom + res / 2),
 //                         cv::Point(hull[i]->getX() * zoom + res / 2, hull[i]->getY() * zoom + res / 2),
@@ -456,9 +476,9 @@ void PointcloudClustering::nextContainer(Container &c) {
 //                                          hull[hull.size() - 1]->getY() * zoom + res / 2),
 //                         cv::Point(hull[0]->getX() * zoom + res / 2, hull[0]->getY() * zoom + res / 2),
 //                         cv::Scalar(255, 255, 0), 1, 8, 0);
+            }
+
         }
-
-
         cv::line(image, cv::Point(res - 20 - zoom, res - 20), cv::Point(res - 20, res - 20), cv::Scalar(255, 255, 0),
                  1);
 
@@ -466,7 +486,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         cv::imshow("Lidar", image);
         stringstream ss;
         ss << "../images/img" << m_itCount++ << ".png";
-        //cv::imwrite(ss.str(), image);
+        cv::imwrite(ss.str(), image);
 
 
         cv::waitKey(1);
