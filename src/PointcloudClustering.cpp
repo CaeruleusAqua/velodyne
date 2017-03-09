@@ -114,27 +114,27 @@ void PointcloudClustering::transform(CompactPointCloud &cpc) {
 
 void PointcloudClustering::segmentGroundByPlane() {
     // devide measurement in sections
-    unsigned int sector_size = m_cloudSize / 8;
+    unsigned int sector_size = m_cloudSize / 30;
     std::vector<Point *> minis;
-    for (int sec = 0; sec < 8; sec += 1) {
-        std::vector<Point *> tmp = utils::minZinSec(sector_size * sec, sector_size * (sec + 1), m_points);
-        minis.insert(minis.end(), tmp.begin(), tmp.end());
-    }
+//    for (int sec = 0; sec < 12; sec += 1) {
+//        std::vector<Point *> tmp = utils::minZinSec(sector_size * sec, sector_size * (sec + 1), m_points);
+//        minis.insert(minis.end(), tmp.begin(), tmp.end());
+//    }
 
 
-//    std::vector<Point *> tmp = utils::minZinSec(sector_size * 0, sector_size * (0 + 1), m_points);
-//    minis.insert(minis.end(), tmp.begin(), tmp.end());
-//    tmp = utils::minZinSec(sector_size * 11, sector_size * (11 + 1), m_points);
-//    minis.insert(minis.end(), tmp.begin(), tmp.end());
-//    tmp = utils::minZinSec(sector_size * 5, sector_size * (5 + 1), m_points);
-//    minis.insert(minis.end(), tmp.begin(), tmp.end());
-//    tmp = utils::minZinSec(sector_size * 6, sector_size * (6 + 1), m_points);
-//    minis.insert(minis.end(), tmp.begin(), tmp.end());
+    std::vector<Point *> tmp = utils::minZinSec(sector_size * 0 + sector_size/2, sector_size * (0 + 1) +sector_size /2, m_points);
+    minis.insert(minis.end(), tmp.begin(), tmp.end());
+    tmp = utils::minZinSec(sector_size * 12 + sector_size/2 , sector_size * (12 + 1) + sector_size/2, m_points);
+    minis.insert(minis.end(), tmp.begin(), tmp.end());
+    tmp = utils::minZinSec(sector_size * 14 + sector_size/2, sector_size * (14 + 1) + sector_size/2 , m_points);
+    minis.insert(minis.end(), tmp.begin(), tmp.end());
+    tmp = utils::minZinSec(sector_size * 28 + sector_size/2, sector_size * (28 + 1) + sector_size/2, m_points);
+    minis.insert(minis.end(), tmp.begin(), tmp.end());
 
     // RANSAC
     double besterror = 100000000;
 
-    std::uniform_int_distribution<> dis(0, ((minis.size() - 1) / 3));
+    std::uniform_int_distribution<> dis(0, ((minis.size() - 1) ));
 
     for (int probes = 0; probes < 50; probes++) {
         std::vector<Point *> maybeinliers;
@@ -179,7 +179,7 @@ void PointcloudClustering::segmentGroundByPlane() {
     for (uint32_t i = 0; i < m_cloudSize; i += 1) {
         for (uint32_t offset = 0; offset < 16; offset++) {
             //Eigen::Vector3f point = m_points[i][offset].getVec();
-            if (m_bestGroundModel.getDist(m_points[i][offset].getVec()) > -0.5) {
+            if (m_bestGroundModel.getDist(m_points[i][offset].getVec()) > -0.3) {
                 m_points[i][offset].setVisited(true);
                 m_points[i][offset].setClustered(true);
                 m_points[i][offset].setIsGround(true);
@@ -212,6 +212,12 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
     if (m_old_clusters.size() == 0) {
         m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
     } else {
+        // correcting clusters with ego movement
+        for (auto &old_cluster : m_old_clusters) {
+            old_cluster.m_center[0] += m_movement_x;
+            old_cluster.m_center[1] += m_movement_y;
+        }
+
         cout << "Searching Cluster.." << endl;
         for (auto &new_cluster : clusters) {
             double min_dist = 10000;
@@ -306,7 +312,8 @@ void PointcloudClustering::nextContainer(Container &c) {
         m_current_timestamp = c.getSentTimeStamp();
         CompactPointCloud cpc = c.getData<CompactPointCloud>();
         transform(cpc);
-        segmentGroundByHeight();
+        //segmentGroundByHeight();
+        segmentGroundByPlane();
 
 
         DbScan dbScan = DbScan(m_points, m_cloudSize);

@@ -50,7 +50,7 @@ namespace utils {
         std::vector<Point *> array;
 
         for (uint32_t i = start; i < start + num_of_minima; i++) {
-            array.push_back(&(points[0][14]));    // this could be wrong...
+            array.push_back(&(points[i][14]));    // this could be wrong...
         }
 
 
