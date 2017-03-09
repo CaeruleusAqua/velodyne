@@ -121,21 +121,24 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
             }
 
 
-            float height = getMostPropWidth(max_y - min_y);
-            float width = getMostPropLenght(max_x - min_x);
+            float width = getMostPropWidth(max_y - min_y);
+            float lenght = getMostPropLenght(max_x - min_x);
+
+            m_best_length = lenght;
+            m_best_width = lenght;
 
 
-            Rect(0, 0) = max_x - width;
+            Rect(0, 0) = max_x - lenght;
             Rect(1, 0) = min_y;
 
             Rect(0, 1) = max_x;
             Rect(1, 1) = min_y;
 
             Rect(0, 2) = max_x;
-            Rect(1, 2) = min_y + height;
+            Rect(1, 2) = min_y + width;
 
-            Rect(0, 3) = max_x - width;
-            Rect(1, 3) = min_y + height;
+            Rect(0, 3) = max_x - lenght;
+            Rect(1, 3) = min_y + width;
 
 
         } else {
@@ -171,8 +174,8 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
                 point = rotCorrection.toRotationMatrix() * point;
             }
 
-            if(m_initial_id == 93) {
-                std::cout<<"------ thetaCorrection: "<<thetaCorrection<<std::endl;
+            if (m_initial_id == 93) {
+                std::cout << "------ thetaCorrection: " << thetaCorrection << std::endl;
             }
 
 
@@ -192,36 +195,38 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
             }
 
 
-            float height = getMostPropWidth(max_y - min_y);
-            float width = getMostPropLenght(max_x - min_x);
+            float width = getMostPropWidth(max_y - min_y);
+            float lenght = getMostPropLenght(max_x - min_x);
+            m_best_length = lenght;
+            m_best_width = width;
 
 
-            Rect(0, 0) = max_x - width;
-            Rect(1, 0) = max_y - height;
+            Rect(0, 0) = max_x - lenght;
+            Rect(1, 0) = max_y - width;
 
             Rect(0, 1) = max_x;
-            Rect(1, 1) = max_y - height;
+            Rect(1, 1) = max_y - width;
 
             Rect(0, 2) = max_x;
             Rect(1, 2) = max_y;
 
-            Rect(0, 3) = max_x - width;
+            Rect(0, 3) = max_x - lenght;
             Rect(1, 3) = max_y;
 
 
         }
 
-        if(m_initial_id == 93) {
-            for(auto &width : m_width){
-                std::cout<<width[0]<<";"<<width[1]<<"-";
+        if (m_initial_id == 93) {
+            for (auto &width : m_width) {
+                std::cout << width[0] << ";" << width[1] << "-";
             }
-            std::cout<<std::endl;
+            std::cout << std::endl;
         }
-        if(m_initial_id == 93) {
-            for(auto &length : m_length){
-                std::cout<<length[0]<<";"<<length[1]<<"-";
+        if (m_initial_id == 93) {
+            for (auto &length : m_length) {
+                std::cout << length[0] << ";" << length[1] << "-";
             }
-            std::cout<<std::endl;
+            std::cout << std::endl;
         }
 
 
@@ -237,7 +242,6 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         m_rectangle[1] = Eigen::Vector2f(Rect(0, 1), Rect(1, 1));
         m_rectangle[2] = Eigen::Vector2f(Rect(0, 2), Rect(1, 2));
         m_rectangle[3] = Eigen::Vector2f(Rect(0, 3), Rect(1, 3));
-
 
 
         float oldPosX = m_current_mean[0];
@@ -259,8 +263,8 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         m_movement_vector[0] = std::cos(m_state[2]) * speed;
 
 
-        if(speed> 10)
-            m_confidence/=2;
+        if (speed > 10)
+            m_confidence /= 2;
 
 
         m_movement_vector += m_current_mean;
@@ -292,7 +296,14 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         m_latestTimestamp = current_time;
 
         clusterCandidates.clear();
-        m_confidence++;
+
+        if (m_best_width + 1 > m_best_length) {
+            m_confidence--;
+        } else if (m_best_width > 4) {
+            m_confidence /= 2;
+        } else if (m_best_length > 10) {
+            m_confidence /= 2;
+        } else m_confidence++;
     } else {
         m_confidence /= 2;
     }

@@ -73,6 +73,8 @@ public:
     uint32_t image_counter = 0;
     double m_speed_x = 10000;
     double m_speed_y = 10000;
+    float m_best_width = 0;
+    float m_best_length = 0;
 
     Eigen::Vector2f m_movement_vector;
     Eigen::Vector2f m_current_mean;
