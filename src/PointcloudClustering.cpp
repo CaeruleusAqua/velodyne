@@ -279,8 +279,11 @@ void PointcloudClustering::nextContainer(Container &c) {
         Point3 cart = m_origin->transform(opendlv::data::environment::WGS84Coordinate(imu.getLat(), imu.getLon()));
 
 
-        m_x = cart.getX();
-        m_y = cart.getY();
+        m_x = cart.getY();
+        m_y = cart.getX();
+
+        std::cout<<"X: "<<m_x<<std::endl;
+        std::cout<<"Y: "<<m_y<<std::endl;
 
         if (!m_imu_updateted) {
             m_old_x = m_x;
@@ -335,32 +338,32 @@ void PointcloudClustering::nextContainer(Container &c) {
         cv::Mat image(res, res, CV_8UC3, cv::Scalar(0, 0, 0));
 
 
-        for (auto &layer : m_scenario->getListOfLayers()) {
-            //cout << layer.getLongName() << endl;
-            for (auto &road : layer.getListOfRoads()) {
-                //cout << road.getLongName() << endl;
-                for (auto &lane : road.getListOfLanes()) {
-                    opendlv::data::scenario::LaneModel *model = lane.getLaneModel();
-                    if (model->getType() == model->POINTMODEL) {
-                        opendlv::data::scenario::PointModel *pointmodel = static_cast<opendlv::data::scenario::PointModel *>(model);
-                        vector<opendlv::data::scenario::IDVertex3> vertexes = pointmodel->getListOfIdentifiableVertices();
-                        bool first = false;
-                        cv::Point oldPoint = cv::Point(0, 0);
-                        for (auto &vertex : vertexes) {
-                            cv::Point newPoint = cv::Point((vertex.getX() - m_x) * zoom + res / 2,
-                                                           (-1 * (vertex.getY() - m_y)) * zoom + res / 2);
-                            if (first) {
-                                cv::line(image, oldPoint,
-                                         newPoint, cv::Scalar(255, 255, 0), 1, 8, 0);
-                            }
-                            oldPoint = newPoint;
-                            first = true;
-                        }
-                    }
-
-                }
-            }
-        }
+//        for (auto &layer : m_scenario->getListOfLayers()) {
+//            //cout << layer.getLongName() << endl;
+//            for (auto &road : layer.getListOfRoads()) {
+//                //cout << road.getLongName() << endl;
+//                for (auto &lane : road.getListOfLanes()) {
+//                    opendlv::data::scenario::LaneModel *model = lane.getLaneModel();
+//                    if (model->getType() == model->POINTMODEL) {
+//                        opendlv::data::scenario::PointModel *pointmodel = static_cast<opendlv::data::scenario::PointModel *>(model);
+//                        vector<opendlv::data::scenario::IDVertex3> vertexes = pointmodel->getListOfIdentifiableVertices();
+//                        bool first = false;
+//                        cv::Point oldPoint = cv::Point(0, 0);
+//                        for (auto &vertex : vertexes) {
+//                            cv::Point newPoint = cv::Point((vertex.getX() - m_x) * zoom + res / 2,
+//                                                           (-1 * (vertex.getY() - m_y)) * zoom + res / 2);
+//                            if (first) {
+//                                cv::line(image, oldPoint,
+//                                         newPoint, cv::Scalar(255, 255, 0), 1, 8, 0);
+//                            }
+//                            oldPoint = newPoint;
+//                            first = true;
+//                        }
+//                    }
+//
+//                }
+//            }
+//        }
 
 
         for (uint32_t i = 0; i < m_cloudSize; i++) {
@@ -386,13 +389,13 @@ void PointcloudClustering::nextContainer(Container &c) {
         }
 
 
-        if(false) {
+        if(true) {
             cv::circle(image, cv::Point((m_x - m_old_x) * zoom + res / 2, -(m_y - m_old_y) * zoom + res / 2), 4, cv::Scalar(128, 255, 128), 2, 8, 0);
             for (auto &obst : m_obstacles) {
 
 
                 //if (false || obst.m_initial_id == 93) {
-                if (obst.m_confidence >= 3) {
+                if (obst.m_confidence >= 1) {
 
                     std::stringstream ss;
                     ss << obst.m_initial_id;
@@ -410,7 +413,7 @@ void PointcloudClustering::nextContainer(Container &c) {
                                 cv::Scalar(255, 255, 255));
                     cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
                     //    cv::circle(image, cv::Point(obst.m_predicted[0] * zoom + res / 2, obst.m_predicted[1] * zoom + res / 2), 4, cv::Scalar(0, 255, 255), 2, 8, 0);
-                    std::cout << "Type: " << obst.m_best_type << std::endl;
+                    //std::cout << "Type: " << obst.m_best_type << std::endl;
                     if (obst.m_best_type == 0)
                         for (int j = 0; j < 4; j++)
                             cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),

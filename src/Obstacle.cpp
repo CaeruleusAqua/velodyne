@@ -8,6 +8,7 @@ LidarObstacle::LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_t
     m_latestTimestamp = current_time;
     m_state << cluster->m_center[0], cluster->m_center[1], 0;
     m_initial_id = cluster->m_id;
+    m_current_mean << 0, 0;
 }
 
 
@@ -15,14 +16,28 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
     if (clusterCandidates.size() > 0) {
         Eigen::Rotation2D<float> rot(-m_state[2]);
         std::list<Eigen::Vector2f> points;
+        std::list<Eigen::Vector2f> points_mean;
+        double x_mean = 0;
+        double y_mean = 0;
+        double values_num=0;
+
 
         for (auto &cluster : clusterCandidates) {
+            values_num+=cluster->getSize();
             for (auto &point : cluster->m_cluster) {
                 Eigen::Vector2f old_point;
                 old_point << point->getX(), point->getY();
+                x_mean += point->getX();
+                y_mean += point->getY();
+                if (point->getZ() > m_max_height) {
+                    m_max_height = point->getZ();
+                }
                 points.push_back(rot.toRotationMatrix() * old_point);
             }
         }
+
+        x_mean/=values_num;
+        y_mean/=values_num;
 
         float min_x = points.front()[0];
         float max_x = points.back()[0];
@@ -230,10 +245,11 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         }
 
 
-        Eigen::Vector2f newPos(max_x, (max_y + min_y) / 2);
+        //Eigen::Vector2f newPos(max_x, (max_y + min_y) / 2);
+        Eigen::Vector2f newPos(x_mean, y_mean);
         Eigen::Rotation2D<float> rotBack(m_state[2] + thetaCorrection);
         m_rectRot = m_state[2] + thetaCorrection;
-        newPos = rotBack.toRotationMatrix() * newPos;
+        //newPos = rotBack.toRotationMatrix() * newPos;
 
         Rect = rotBack.toRotationMatrix() * Rect;
 
@@ -250,11 +266,14 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         m_current_mean[1] = (Rect(1, 0) + Rect(1, 1) + Rect(1, 2) + Rect(1, 3)) / 4.0f;
         double dt = (current_time - m_latestTimestamp).toMicroseconds() / 1000000.0d;
 
-        double speed = 2;
+        double speed = 0;
         if (oldPosX != 0 || oldPosY != 0) {
             m_speed_x = 0.5 * ((m_current_mean[0] - oldPosX) / dt) + m_speed_x * 0.5;
             m_speed_y = 0.5 * ((m_current_mean[1] - oldPosY) / dt) + m_speed_y * 0.5;
             speed = std::sqrt(m_speed_x * m_speed_x + m_speed_y * m_speed_y);
+            if (speed > 100) {
+                speed = 0;
+            }
             //std::cout << "Speed: " << speed << std::endl;
         }
 
@@ -271,18 +290,20 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
         float dx = newPos[0] - m_state[0] + movement_x;
         float dy = newPos[1] - m_state[1] + movement_y;
-        if (m_initial_id == 93) {
-            std::cout << "Dx: " << dx << std::endl;
-            std::cout << "Dy: " << dy << std::endl;
-            std::cout << "movement_x: " << movement_x << std::endl;
-            std::cout << "movement_y: " << movement_y << std::endl;
-            std::cout << "Theta: " << m_state[2] / M_PI * 180 << std::endl;
-        }
+        std::cout << "------------------------" << std::endl;
+        std::cout << "dt: " << dt << std::endl;
+        std::cout << "ID: " << m_initial_id << std::endl;
+        std::cout << "Dx: " << dx << std::endl;
+        std::cout << "Dy: " << dy << std::endl;
+        std::cout << "movement_x: " << movement_x << std::endl;
+        std::cout << "movement_y: " << movement_y << std::endl;
+        std::cout << "Theta: " << m_state[2] / M_PI * 180 << std::endl;
+        std::cout << "speed: " << speed << std::endl;
 
 
         float movement = std::sqrt((m_state[0] - newPos[0]) * (m_state[0] - newPos[0]) + (m_state[1] - newPos[1]) * (m_state[1] - newPos[1]));
         //movement =0;
-        if (movement > 2) {
+        if (movement > 3) {
             m_state[0] = newPos[0];
             m_state[1] = newPos[1];
 
@@ -297,13 +318,30 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
         clusterCandidates.clear();
 
-        if (m_best_width + 1 > m_best_length) {
-            m_confidence--;
-        } else if (m_best_width > 4) {
+        int type = 0;
+        if (m_best_length <= 1.5 && m_best_width <= 1.5) {
+            type = 3;
+        } else if (m_best_length <= 2 && m_best_width <= 1.5) {
+            type = 2;
+        } else if (m_best_length <= 10 && m_best_width <= 4) {
+            type = 1;
+        }
+
+        //m_best_type = getMostPropType(type);
+        m_best_type = type;
+
+        if (m_max_height > 4.5) {//building
             m_confidence /= 2;
-        } else if (m_best_length > 10) {
+        } else if ((m_best_width + 1.01 > m_best_length) && (type == 1 || type == 2)) {
+            m_confidence--;
+        } else if (m_best_width > 4 || m_best_length > 10) {
             m_confidence /= 2;
         } else m_confidence++;
+
+
+        std::cout << "m_best_width: " << m_best_width << std::endl;
+        std::cout << "m_best_length: " << m_best_length << std::endl;
+        m_confidence++;
     } else {
         m_confidence /= 2;
     }

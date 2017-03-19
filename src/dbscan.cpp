@@ -26,7 +26,7 @@ void DbScan::getClusters(std::vector<Cluster> &clusters) {
 
 
 void DbScan::regionQuery(std::vector<Point *> &neighbors, Point *point) {
-    int didx = 2;
+    int didx = 5;
     int i = point->getIndex();
     int neg_idx = i - didx;
     int pos_idx = i + 1 + didx - m_cloudSize;

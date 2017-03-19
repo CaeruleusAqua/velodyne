@@ -15,6 +15,7 @@ private:
     std::list<std::array<int,2>> m_width;
     std::list<std::array<int,2>> m_length;
     std::list<std::array<int,2>> m_type;
+    float m_max_height = 0;
 
     float getMostPropType(int type){
         bool found = false;
@@ -95,8 +96,8 @@ public:
     int32_t m_confidence = 0;
     double m_rectRot=0;
     uint32_t image_counter = 0;
-    double m_speed_x = 10000;
-    double m_speed_y = 10000;
+    double m_speed_x = 0;
+    double m_speed_y = 0;
     float m_best_width = 0;
     float m_best_length = 0;
     // 0 -unclassified ; 1 - Car ; 2 cycelist ; 3 - pedestrian
