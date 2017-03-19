@@ -46,7 +46,7 @@ INCLUDE_DIRECTORIES (SYSTEM ${ODVDAPPLANIX_INCLUDE_DIRS})
 
 # add scanned files as libs
 add_library(${PROJECT_NAME}-utils STATIC src/Utils.cpp)
-add_library(${PROJECT_NAME}-pointcloud-clustering STATIC src/pointcloud.cpp src/dbscan.cpp src/Obstacle.cpp src/Cluster.cpp src/PointcloudClustering.cpp src/Point.cpp src/Plane.cpp)
+add_library(${PROJECT_NAME}-pointcloud-clustering STATIC src/pointcloud.cpp src/dbscan.cpp src/Obstacle.cpp src/Cluster.cpp src/PointcloudClustering.cpp src/Point.cpp src/Plane.cpp src/kalman.cpp)
 
 
 # add od and scnanned libs to LIBRARIES
@@ -54,8 +54,8 @@ set(LIBRARIES ${AUTOMOTIVEDATA_LIBRARIES} ${ODVDAPPLANIX_LIBRARY} ${OPENDLV_LIBR
 
 # set cflags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11") ## -Wall -Wextra")
-SET(CMAKE_CXX_FLAGS_RELEASE "-march=native -O3 -pipe")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall ")
+SET(CMAKE_CXX_FLAGS_RELEASE "-march=native -O2 -pipe")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Wextra")
 
 add_executable(${PROJECT_NAME} main.cpp)
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${LIBRARIES} ${OpenCV_LIBS})

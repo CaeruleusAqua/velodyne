@@ -42,21 +42,22 @@ void PointcloudClustering::setUp() {
 
     cout << "This method is called before the component's body is executed." << endl;
     cv::namedWindow("Lidar", cv::WINDOW_AUTOSIZE);
-    const odcore::io::URL urlOfSCNXFile(getKeyValueConfiguration().getValue<string>("global.scenario"));
-    core::wrapper::graph::DirectedGraph m_graph;
-    opendlv::scenario::SCNXArchive &scnxArchive = opendlv::scenario::SCNXArchiveFactory::getInstance().getSCNXArchive(
-            urlOfSCNXFile);
+    //const odcore::io::URL urlOfSCNXFile(getKeyValueConfiguration().getValue<string>("global.scenario"));
+    //core::wrapper::graph::DirectedGraph m_graph;
+    //opendlv::scenario::SCNXArchive &scnxArchive = opendlv::scenario::SCNXArchiveFactory::getInstance().getSCNXArchive(
+    //        urlOfSCNXFile);
 
-    m_scenario = &scnxArchive.getScenario();
+    //m_scenario = &scnxArchive.getScenario();
 
     // Construct road network.
-    opendlv::scenario::LaneVisitor lv(m_graph, *m_scenario);
-    m_scenario->accept(lv);
+    //opendlv::scenario::LaneVisitor lv(m_graph, *m_scenario);
+    //m_scenario->accept(lv);
 
-    opendlv::data::scenario::Vertex3 origin = m_scenario->getHeader().getWGS84CoordinateSystem().getOrigin();
-    cout << endl;
-    cout << "Origin: \n" << origin;
-    m_origin = new opendlv::data::environment::WGS84Coordinate(origin.getX(), origin.getY());
+    //opendlv::data::scenario::Vertex3 origin = m_scenario->getHeader().getWGS84CoordinateSystem().getOrigin();
+    //cout << endl;
+    //cout << "Origin: \n" << origin;
+    //m_origin = new opendlv::data::environment::WGS84Coordinate(origin.getX(), origin.getY());
+    m_origin = new opendlv::data::environment::WGS84Coordinate(57.77284, 12.769964);
 
 }
 
@@ -247,6 +248,7 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
     }
 
     for (auto &cluster : clusters) {
+
         unsigned int current_id = cluster.m_id;
         LidarObstacle *tmp = nullptr;
         for (auto &obst : m_obstacles) {
@@ -279,11 +281,11 @@ void PointcloudClustering::nextContainer(Container &c) {
         Point3 cart = m_origin->transform(opendlv::data::environment::WGS84Coordinate(imu.getLat(), imu.getLon()));
 
 
-        m_x = cart.getY();
-        m_y = cart.getX();
+        m_x = cart.getX();
+        m_y = cart.getY();
 
-        std::cout<<"X: "<<m_x<<std::endl;
-        std::cout<<"Y: "<<m_y<<std::endl;
+        //std::cout<<"X: "<<m_x<<std::endl;
+        //std::cout<<"Y: "<<m_y<<std::endl;
 
         if (!m_imu_updateted) {
             m_old_x = m_x;
@@ -315,8 +317,8 @@ void PointcloudClustering::nextContainer(Container &c) {
         m_current_timestamp = c.getSentTimeStamp();
         CompactPointCloud cpc = c.getData<CompactPointCloud>();
         transform(cpc);
-        //segmentGroundByHeight();
-        segmentGroundByPlane();
+        segmentGroundByHeight();
+        //segmentGroundByPlane();
 
 
         DbScan dbScan = DbScan(m_points, m_cloudSize);
@@ -394,52 +396,61 @@ void PointcloudClustering::nextContainer(Container &c) {
             for (auto &obst : m_obstacles) {
 
 
-                //if (false || obst.m_initial_id == 93) {
-                if (obst.m_confidence >= 1) {
+                if (false || obst.m_initial_id == 54) {
+                    if (obst.m_confidence >= 1) {
 
-                    std::stringstream ss;
-                    ss << obst.m_initial_id;
+                        std::stringstream ss;
+                        ss << obst.m_initial_id;
 
-                    cv::putText(image, ss.str(),
-                                cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2),
-                                cv::FONT_HERSHEY_SIMPLEX, 0.33,
-                                cv::Scalar(255, 0, 0));
+                        cv::putText(image, ss.str(),
+                                    cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2),
+                                    cv::FONT_HERSHEY_SIMPLEX, 0.33,
+                                    cv::Scalar(255, 0, 0));
 
-                    std::stringstream ss2;
-                    ss2 << obst.m_state[2] / M_PI * 180;
-                    cv::putText(image, ss2.str(),
-                                cv::Point(res - 50 - zoom, res - 20),
-                                cv::FONT_HERSHEY_SIMPLEX, 0.33,
-                                cv::Scalar(255, 255, 255));
-                    cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
-                    //    cv::circle(image, cv::Point(obst.m_predicted[0] * zoom + res / 2, obst.m_predicted[1] * zoom + res / 2), 4, cv::Scalar(0, 255, 255), 2, 8, 0);
-                    //std::cout << "Type: " << obst.m_best_type << std::endl;
-                    if (obst.m_best_type == 0)
-                        for (int j = 0; j < 4; j++)
-                            cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
-                                     cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 255, 255), 1,
-                                     8);
-                    else if (obst.m_best_type == 1)
-                        for (int j = 0; j < 4; j++)
-                            cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
-                                     cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 0, 255), 1,
-                                     8);
-                    else if (obst.m_best_type == 2)
-                        for (int j = 0; j < 4; j++)
-                            cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
-                                     cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(0, 255, 255), 1,
-                                     8);
-                    else if (obst.m_best_type == 3)
-                        for (int j = 0; j < 4; j++)
-                            cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
-                                     cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 255, 0), 1,
-                                     8);
+                        std::stringstream ss2;
+                        ss2 << obst.m_state[2] / M_PI * 180;
+                        cv::putText(image, ss2.str(),
+                                    cv::Point(res - 50 - zoom, res - 20),
+                                    cv::FONT_HERSHEY_SIMPLEX, 0.33,
+                                    cv::Scalar(255, 255, 255));
+                        cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
+                        cv::circle(image, cv::Point(obst.m_filter.m_x[0] * zoom + res / 2, -obst.m_filter.m_x[1] * zoom + res / 2), 4, cv::Scalar(0, 0, 255), 2, 8, 0);
+                        if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
+                            cv::arrowedLine(image, cv::Point(obst.m_filter.m_x[0] * zoom + res / 2, -obst.m_filter.m_x[1] * zoom + res / 2),
+                                            cv::Point(obst.m_movement_vector_filtered[0] * zoom + res / 2, -obst.m_movement_vector_filtered[1] * zoom + res / 2),
+                                            cv::Scalar(0, 0, 255), 1, 8, 0, 0.1);
+                        //std::cout << "Type: " << obst.m_best_type << std::endl;
+                        if (obst.m_best_type == 0)
+                            for (int j = 0; j < 4; j++)
+                                cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                         cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2),
+                                         cv::Scalar(255, 255, 255), 1,
+                                         8);
+                        else if (obst.m_best_type == 1)
+                            for (int j = 0; j < 4; j++)
+                                cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                         cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 0, 255),
+                                         1,
+                                         8);
+                        else if (obst.m_best_type == 2)
+                            for (int j = 0; j < 4; j++)
+                                cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                         cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(0, 255, 255),
+                                         1,
+                                         8);
+                        else if (obst.m_best_type == 3)
+                            for (int j = 0; j < 4; j++)
+                                cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                         cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 255, 0),
+                                         1,
+                                         8);
 
-                    if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
-                        cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),
-                                        cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
-                                        cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
+                        if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
+                            cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),
+                                            cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
+                                            cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
 
+                    }
                 }
 
             }
