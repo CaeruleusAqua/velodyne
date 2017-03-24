@@ -70,6 +70,19 @@ void Kalman::predict(double dt) {
 }
 
 void Kalman::update(double x, double y, double theta, double speed, double yaw) {
+    double z2_1 = theta;
+    double z2_2 = theta + 2 * M_PI;
+    double z2_3 = theta - 2 * M_PI;
+
+    if(abs(z2_1 - m_x[2])<abs(z2_2 - m_x[2]) && abs(z2_1 - m_x[2])<abs(z2_3 - m_x[2]))
+        theta = z2_1;
+    if(abs(z2_2 - m_x[2])<abs(z2_1 - m_x[2]) && abs(z2_2 - m_x[2])<abs(z2_3 - m_x[2]))
+        theta = z2_2;
+    if(abs(z2_3 - m_x[2])<abs(z2_1 - m_x[2]) && abs(z2_3 - m_x[2])<abs(z2_2 - m_x[2]))
+        theta = z2_3;
+
+
+
     Eigen::Matrix<double, 5, 1> Z;
     Z << x, y, theta, speed, yaw;
     // Measurement Function

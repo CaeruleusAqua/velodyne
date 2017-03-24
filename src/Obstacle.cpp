@@ -317,13 +317,17 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
 
         clusterCandidates.clear();
-        double yaw_rate = (M_PI - std::fabs(std::fmod(std::fabs(m_rectRot_old - m_rectRot), 2.0 * M_PI) - M_PI))/dt;
+        double yaw_rate = (M_PI - std::fabs(std::fmod(std::fabs(m_rectRot_old - m_rectRot), 2.0 * M_PI) - M_PI));
+        if ((m_rectRot_old + yaw_rate - m_rectRot) > 0.00001) {
+            yaw_rate = -yaw_rate;
+        }
+        yaw_rate /= dt;
         if (!m_filter.isReady()) {
             m_filter.init(m_current_mean[0], m_current_mean[1], m_rectRot, speed, 0);
         } else {
 
-            //m_filter.update(m_current_mean[0], m_current_mean[1],m_rectRot, speed, yaw_rate);
-            m_filter.update(m_current_mean[0], m_current_mean[1], m_rectRot, 2, 0);
+            m_filter.update(m_current_mean[0], m_current_mean[1], m_rectRot, speed, yaw_rate);
+            //m_filter.update(m_current_mean[0], m_current_mean[1], m_rectRot, 2, 0);
         }
 
         m_movement_vector_filtered[1] = std::sin(m_filter.m_x[2]) * m_filter.m_x[3];
