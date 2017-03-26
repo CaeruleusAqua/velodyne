@@ -1,4 +1,4 @@
-#define VIS
+//#define VIS
 
 #include "PointcloudClustering.h"
 #include <chrono>
@@ -19,6 +19,7 @@
 #include "opendlv/scenario/LaneVisitor.h"
 
 #include "odvdapplanix/GeneratedHeaders_ODVDApplanix.h"
+
 
 using namespace std;
 
@@ -280,8 +281,8 @@ void PointcloudClustering::segmentGroundByHeight() {
 void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
 
     for (auto &cluster : clusters) {
-        cluster.calcRectangle();
-        cluster.meanRect();
+        //cluster.calcRectangle();
+        cluster.mean();
     }
 
     for (auto &obst : m_obstacles) {
@@ -289,7 +290,7 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
         double x = obst.m_filter.m_x[0] + m_movement_x;
         double y = obst.m_filter.m_x[1] + m_movement_y;
         for (auto &cluster : clusters) {
-            if (!cluster.assigned && cluster.get2Distance(x, y) < 1) {
+            if (!cluster.assigned && cluster.get2Distance(x, y) < 3) {
                 cluster.assigned = true;
                 obst.clusterCandidates.push_back(&cluster);
             }
@@ -450,12 +451,6 @@ void PointcloudClustering::nextContainer(Container &c) {
                                     cv::FONT_HERSHEY_SIMPLEX, 0.33,
                                     cv::Scalar(255, 0, 0));
 
-                        std::stringstream ss2;
-                        ss2 << obst.m_state[2] / M_PI * 180;
-                        cv::putText(image, ss2.str(),
-                                    cv::Point(res - 50 - zoom, res - 20),
-                                    cv::FONT_HERSHEY_SIMPLEX, 0.33,
-                                    cv::Scalar(255, 255, 255));
                         cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
                         cv::circle(image, cv::Point(obst.m_filter.m_x[0] * zoom + res / 2, -obst.m_filter.m_x[1] * zoom + res / 2), 4, cv::Scalar(0, 0, 255), 2, 8, 0);
                         if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
@@ -533,11 +528,43 @@ void PointcloudClustering::nextContainer(Container &c) {
         }
         cv::line(image, cv::Point(res - 20 - zoom, res - 20), cv::Point(res - 20, res - 20), cv::Scalar(255, 255, 0), 1);
 
+        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(res / 2+50, res / 2),
+                        cv::Scalar(255, 255, 255), 1, 8, 0, 0.1);
+
+        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(res / 2, res / 2-50),
+                        cv::Scalar(255, 255, 255), 1, 8, 0, 0.1);
+
+
+        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(m_movement_x*3 * zoom + res / 2, -m_movement_y*3 * zoom + res / 2),
+                        cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
+
 
         cv::imshow("Lidar", image);
         stringstream ss;
         ss << "../images/img" << m_itCount++ << ".png";
         //cv::imwrite(ss.str(), image);
+
+        cout << "Sending " << m_itCount << "-th time stamp data...";
+        TimeStamp ts(m_itCount, 2*m_itCount++);
+        Container c(ts);
+        getConference().send(c);
+        cout << "Sending " << m_itCount << "-th time stamp data... finished";
+
+//        for (auto &obst : m_obstacles) {
+//            opendlv::core::sensors::applanix::obstacles odvd_obst;
+//            odvd_obst.setObjId(obst.m_initial_id);
+//            odvd_obst.setSpeed(obst.m_filter.m_x[3]);
+//            odvd_obst.setTheta(obst.m_filter.m_x[2]);
+//            odvd_obst.setYaw_rate(obst.m_filter.m_x[4]);
+//            odvd_obst.setPos_x(obst.m_filter.m_x[0]);
+//            odvd_obst.setPos_y(obst.m_filter.m_x[1]);
+//            odvd_obst.setType(obst.m_best_type);
+//
+//            Container c(odvd_obst);
+//            getConference().send(c);
+//            sleep(100);
+//            break;
+//        }
 
 
         cv::waitKey(1);
@@ -549,7 +576,14 @@ void PointcloudClustering::nextContainer(Container &c) {
         millis += std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1000000.0;
 
         std::cout << "Time difference = " << millis << std::endl;
+
+
+        cout << "Sending " << m_itCount << "-th time stamp data...";
+        TimeStamp ts(m_itCount, 2*m_itCount++);
+        Container c(ts);
+        getConference().send(c);
+        cout << "Sending " << m_itCount << "-th time stamp data... finished";
+
     }
 
 }
-
