@@ -22,7 +22,7 @@ public:
 
     void predict(double dt);
 
-    void update(double x, double y,double theta, double speed,double yaw);
+    void update(double x, double y,double theta, double speed,double yaw, double movement_x, double movement_y);
 
     bool isReady() {
         return ready;

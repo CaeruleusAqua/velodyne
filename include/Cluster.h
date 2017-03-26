@@ -14,9 +14,7 @@ public:
 
     std::vector<Point *> m_hull;
 
-    unsigned int m_id;
     double m_center[3];
-    bool matched;
     bool assigned;
     std::vector<Point *> m_cluster;
     cv::Point2f m_rectangle[4];

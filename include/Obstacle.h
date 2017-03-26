@@ -67,7 +67,7 @@ private:
 
 public:
 
-    int32_t m_confidence = 0;
+    int32_t m_confidence = 1;
     uint64_t m_initial_id = 0;
     double m_rectRot=0;
     double m_rectRot_old=0;
@@ -91,7 +91,9 @@ public:
     std::list<Cluster *> clusterCandidates;
 
     bool isInRect(Point &point);
-    LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_time);
+    LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_time, uint64_t id);
     void refresh(double movement_x, double movement_y, odcore::data::TimeStamp current_time, int img_count);
     double getDistance(Cluster &cluster);
+    bool confidenceIsZero();
+    double getDt(odcore::data::TimeStamp current_time);
 };

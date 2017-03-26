@@ -207,67 +207,114 @@ void PointcloudClustering::segmentGroundByHeight() {
 }
 
 
+//void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
+//
+//    if (m_old_clusters.size() == 0) {
+//        m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
+//    } else {
+//        // correcting clusters with ego movement
+//        for (auto &old_cluster : m_old_clusters) {
+//            old_cluster.m_center[0] += m_movement_x;
+//            old_cluster.m_center[1] += m_movement_y;
+//        }
+//
+//        cout << "Searching Cluster.." << endl;
+//        for (auto &new_cluster : clusters) {
+//            double min_dist = 10000;
+//            Cluster *next = nullptr;
+//            for (auto &old_cluster : m_old_clusters) {
+//                if (!old_cluster.matched) {
+//                    double dist = new_cluster.get2Distance(old_cluster);
+//                    if (dist < min_dist) {
+//                        next = &old_cluster;
+//                        min_dist = dist;
+//                    }
+//                }
+//            }
+//            if (next != nullptr && min_dist < 3) {
+//                new_cluster.m_id = next->m_id;
+//                next->matched = false;
+//            }
+//        }
+//        m_old_clusters.clear();
+//        m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
+//    }
+//
+//
+//    if (m_obstacles.size() == 0) {
+//        for (auto &cluster : clusters) {
+//            m_obstacles.push_back(LidarObstacle(&cluster, m_current_timestamp));
+//        }
+//    }
+//
+//    for (auto &cluster : clusters) {
+//
+//        unsigned int current_id = cluster.m_id;
+//        LidarObstacle *tmp = nullptr;
+//        for (auto &obst : m_obstacles) {
+//            if (obst.m_initial_id == current_id) {
+//                tmp = &obst;
+//                obst.clusterCandidates.push_back(&cluster);
+//            }
+//        }
+//        if (tmp == nullptr) {
+//            m_obstacles.push_back(LidarObstacle(&cluster, m_current_timestamp));
+//        }
+//    }
+//
+//    for (auto &obst : m_obstacles) {
+//        obst.refresh(m_movement_x, m_movement_y, m_current_timestamp, m_itCount);
+//    }
+//
+//    std::cout<<"------------------------------------"<<m_obstacles.size()<<endl;
+//    m_obstacles.remove_if([] (LidarObstacle &i) {
+//        return i.confidenceIsZero();
+//    });
+//
+//
+//
+//    std::cout<<"------------------------------------"<<m_obstacles.size()<<endl;
+//
+//}
+
 void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
 
-
-    if (m_old_clusters.size() == 0) {
-        m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
-    } else {
-        // correcting clusters with ego movement
-        for (auto &old_cluster : m_old_clusters) {
-            old_cluster.m_center[0] += m_movement_x;
-            old_cluster.m_center[1] += m_movement_y;
-        }
-
-        cout << "Searching Cluster.." << endl;
-        for (auto &new_cluster : clusters) {
-            double min_dist = 10000;
-            Cluster *next = nullptr;
-            for (auto &old_cluster : m_old_clusters) {
-                if (!old_cluster.matched) {
-                    double dist = new_cluster.get2Distance(old_cluster);
-                    if (dist < min_dist) {
-                        next = &old_cluster;
-                        min_dist = dist;
-                    }
-                }
-            }
-            if (next != nullptr && min_dist < 3) {
-                new_cluster.m_id = next->m_id;
-                next->matched = false;
-            }
-        }
-        m_old_clusters.clear();
-        m_old_clusters.insert(m_old_clusters.begin(), clusters.begin(), clusters.end());
-    }
-
-    if (m_obstacles.size() == 0) {
-        for (auto &cluster : clusters) {
-            m_obstacles.push_back(LidarObstacle(&cluster, m_current_timestamp));
-        }
-    }
-
     for (auto &cluster : clusters) {
-
-        unsigned int current_id = cluster.m_id;
-        LidarObstacle *tmp = nullptr;
-        for (auto &obst : m_obstacles) {
-            if (obst.m_initial_id == current_id) {
-                tmp = &obst;
-                obst.clusterCandidates.push_back(&cluster);
-            }
-        }
-        if (tmp == nullptr) {
-            m_obstacles.push_back(LidarObstacle(&cluster, m_current_timestamp));
-        }
+        cluster.calcRectangle();
+        cluster.meanRect();
     }
 
     for (auto &obst : m_obstacles) {
+        obst.m_filter.predict(obst.getDt(m_current_timestamp));
+        double x = obst.m_filter.m_x[0] + m_movement_x;
+        double y = obst.m_filter.m_x[1] + m_movement_y;
+        for (auto &cluster : clusters) {
+            if (!cluster.assigned && cluster.get2Distance(x, y) < 1) {
+                cluster.assigned = true;
+                obst.clusterCandidates.push_back(&cluster);
+            }
+        }
         obst.refresh(m_movement_x, m_movement_y, m_current_timestamp, m_itCount);
     }
+    for (auto &cluster : clusters) {
+        if (!cluster.assigned) {
+
+            m_obstacles.push_back(LidarObstacle(&cluster, m_current_timestamp,m_id_counter++));
+            cluster.assigned = true;
+        }
+    }
+
+    std::cout << "------------------------------------" << m_obstacles.size() << endl;
+    m_obstacles.remove_if([](LidarObstacle &i) {
+        return i.confidenceIsZero();
+    });
+
+
+    std::cout << "------------------------------------" << m_obstacles.size() << endl;
 
 
 }
+
 
 void PointcloudClustering::nextContainer(Container &c) {
     if (c.getDataType() == opendlv::core::sensors::applanix::Grp1Data::ID()) {
@@ -325,17 +372,13 @@ void PointcloudClustering::nextContainer(Container &c) {
 
         std::vector<Cluster> clusters;
         dbScan.getClusters(clusters);
-        for (auto &cluster : clusters) {
-            cluster.m_id = m_id_counter++;
-            cluster.mean();
-        }
+
         trackObstacles(clusters);
 
 #ifdef VIS
 
         const static int res = 1000;
         const static int zoom = 12;
-
 
         cv::Mat image(res, res, CV_8UC3, cv::Scalar(0, 0, 0));
 
@@ -391,13 +434,13 @@ void PointcloudClustering::nextContainer(Container &c) {
         }
 
 
-        if(true) {
+        if (true) {
             cv::circle(image, cv::Point((m_x - m_old_x) * zoom + res / 2, -(m_y - m_old_y) * zoom + res / 2), 4, cv::Scalar(128, 255, 128), 2, 8, 0);
             for (auto &obst : m_obstacles) {
 
 
-                if (false || obst.m_initial_id == 54) {
-                    if (obst.m_confidence >= 1) {
+                if (true || obst.m_initial_id == 54) {
+                    if (obst.m_confidence >= 0) {
 
                         std::stringstream ss;
                         ss << obst.m_initial_id;
@@ -458,8 +501,6 @@ void PointcloudClustering::nextContainer(Container &c) {
 
             for (auto &cluster : clusters) {
 //            auto hull = utils::convex_hull(cluster);
-                std::stringstream ss;
-                ss << cluster.m_id;
                 //cv::circle(image, cv::Point(cluster.m_center[0] * zoom + res / 2, cluster.m_center[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
 //
 //            std::vector<cv::Point2f> vec;
@@ -476,10 +517,7 @@ void PointcloudClustering::nextContainer(Container &c) {
 //                             cv::Point(rec[(j + 1) % 4].x * zoom + res / 2, rec[(j + 1) % 4].y * zoom + res / 2), cv::Scalar(255, 0, 255), 1, 8);
 //            }
 
-                cv::putText(image, ss.str(),
-                            cv::Point(cluster.m_center[0] * zoom + res / 2, -cluster.m_center[1] * zoom + res / 2),
-                            cv::FONT_HERSHEY_SIMPLEX, 0.33,
-                            cv::Scalar(255, 255, 255));
+
 //            for (uint32_t i = 1; i < hull.size(); i++) {
 //                cv::line(image, cv::Point(hull[i - 1]->getX() * zoom + res / 2, hull[i - 1]->getY() * zoom + res / 2),
 //                         cv::Point(hull[i]->getX() * zoom + res / 2, hull[i]->getY() * zoom + res / 2),
@@ -493,14 +531,13 @@ void PointcloudClustering::nextContainer(Container &c) {
             }
 
         }
-        cv::line(image, cv::Point(res - 20 - zoom, res - 20), cv::Point(res - 20, res - 20), cv::Scalar(255, 255, 0),
-                 1);
+        cv::line(image, cv::Point(res - 20 - zoom, res - 20), cv::Point(res - 20, res - 20), cv::Scalar(255, 255, 0), 1);
 
 
         cv::imshow("Lidar", image);
         stringstream ss;
         ss << "../images/img" << m_itCount++ << ".png";
-        cv::imwrite(ss.str(), image);
+        //cv::imwrite(ss.str(), image);
 
 
         cv::waitKey(1);

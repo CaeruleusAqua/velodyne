@@ -19,13 +19,13 @@ void Kalman::predict(double dt) {
     if (abs(m_x[4]) < 0.0001) {  // Driving straight
         m_x[0] = m_x[0] + m_x[3] * dt * cos(m_x[2]);
         m_x[1] = m_x[1] + m_x[3] * dt * sin(m_x[2]);
-        m_x[2] = m_x[2];
-        m_x[3] = m_x[3];
-        m_x[4] = 0.0000001;//  # avoid numerical issues in Jacobians
+        m_x[2] = fmod((m_x[2] + m_x[4] * dt + M_PI), (2.0 * M_PI)) - M_PI;
+//        m_x[3] = m_x[3];
+//        m_x[4] = m_x[4];
 
 
-        JA << 1.0, 0.0, 0.0, 0.0, 0.0,
-                0.0, 1.0, 0.0, 0.0, 0.0,
+        JA << 1.0, 0.0, -dt * m_x[3] * sin(m_x[2]), dt * cos(m_x[2]), 0.0,
+                0.0, 1.0, dt * m_x[3] * cos(m_x[2]), dt * sin(m_x[2]), 0.0,
                 0.0, 0.0, 1.0, 0.0, dt,
                 0.0, 0.0, 0.0, 1.0, 0.0,
                 0.0, 0.0, 0.0, 0.0, 1.0;
@@ -69,22 +69,21 @@ void Kalman::predict(double dt) {
     m_P = JA * m_P * JA.transpose() + Q;
 }
 
-void Kalman::update(double x, double y, double theta, double speed, double yaw) {
+void Kalman::update(double x, double y, double theta, double speed, double yaw, double movement_x, double movement_y) {
     double z2_1 = theta;
     double z2_2 = theta + 2 * M_PI;
     double z2_3 = theta - 2 * M_PI;
 
-    if(abs(z2_1 - m_x[2])<abs(z2_2 - m_x[2]) && abs(z2_1 - m_x[2])<abs(z2_3 - m_x[2]))
+    if (abs(z2_1 - m_x[2]) < abs(z2_2 - m_x[2]) && abs(z2_1 - m_x[2]) < abs(z2_3 - m_x[2]))
         theta = z2_1;
-    if(abs(z2_2 - m_x[2])<abs(z2_1 - m_x[2]) && abs(z2_2 - m_x[2])<abs(z2_3 - m_x[2]))
+    if (abs(z2_2 - m_x[2]) < abs(z2_1 - m_x[2]) && abs(z2_2 - m_x[2]) < abs(z2_3 - m_x[2]))
         theta = z2_2;
-    if(abs(z2_3 - m_x[2])<abs(z2_1 - m_x[2]) && abs(z2_3 - m_x[2])<abs(z2_2 - m_x[2]))
+    if (abs(z2_3 - m_x[2]) < abs(z2_1 - m_x[2]) && abs(z2_3 - m_x[2]) < abs(z2_2 - m_x[2]))
         theta = z2_3;
 
 
-
     Eigen::Matrix<double, 5, 1> Z;
-    Z << x, y, theta, speed, yaw;
+    Z << x-movement_x, y-movement_y, theta, speed, yaw;
     // Measurement Function
 
     Eigen::Matrix<double, 5, 1> hx;
@@ -123,4 +122,6 @@ void Kalman::update(double x, double y, double theta, double speed, double yaw) 
 
     // Update the error covariance
     m_P = (m_I - (K * JH)) * m_P;
+    m_x[0]+=movement_x;
+    m_x[1]+=movement_y;
 }

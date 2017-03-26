@@ -9,8 +9,6 @@ Cluster::Cluster() : m_cluster() {
     m_center[0] = 0;
     m_center[1] = 0;
     m_center[2] = 0;;
-    m_id = 0;
-    matched = false;
     assigned = false;
 }
 
