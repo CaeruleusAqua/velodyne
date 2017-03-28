@@ -1,4 +1,4 @@
-//#define VIS
+#define VIS
 
 #include "PointcloudClustering.h"
 #include <chrono>
@@ -17,8 +17,9 @@
 #include "opendlv/data/planning/Route.h"
 
 #include "opendlv/scenario/LaneVisitor.h"
-
 #include "odvdapplanix/GeneratedHeaders_ODVDApplanix.h"
+#include <opendavinci/odcore/io/tcp/TCPConnection.h>
+#include <opendavinci/odcore/io/tcp/TCPFactory.h>
 
 
 using namespace std;
@@ -32,6 +33,7 @@ using namespace odcore::data;
 using namespace automotive;
 using namespace automotive::miniature;
 using namespace opendlv::data::environment;
+
 
 PointcloudClustering::PointcloudClustering(const int32_t &argc, char **argv) :
         DataTriggeredConferenceClientModule(argc, argv, "PointcloudClustering"),
@@ -59,6 +61,17 @@ void PointcloudClustering::setUp() {
     //cout << "Origin: \n" << origin;
     //m_origin = new opendlv::data::environment::WGS84Coordinate(origin.getX(), origin.getY());
     m_origin = new opendlv::data::environment::WGS84Coordinate(57.77284, 12.769964);
+    // We are using OpenDaVINCI's std::shared_ptr to automatically
+    // release any acquired resources.
+
+    const string RECEIVER = "127.0.0.1";
+    const uint32_t PORT = 1234;
+    try {
+        connection = std::shared_ptr<odcore::io::tcp::TCPConnection>(odcore::io::tcp::TCPFactory::createTCPConnectionTo(RECEIVER, PORT));
+    }
+    catch (string &exception) {
+        cerr << "TCP-connection error: " << exception << endl;
+    }
 
 }
 
@@ -300,7 +313,7 @@ void PointcloudClustering::trackObstacles(std::vector<Cluster> &clusters) {
     for (auto &cluster : clusters) {
         if (!cluster.assigned) {
 
-            m_obstacles.push_back(LidarObstacle(&cluster, m_current_timestamp,m_id_counter++));
+            m_obstacles.push_back(LidarObstacle(&cluster, m_current_timestamp, m_id_counter++));
             cluster.assigned = true;
         }
     }
@@ -441,15 +454,8 @@ void PointcloudClustering::nextContainer(Container &c) {
 
 
                 if (true || obst.m_initial_id == 54) {
-                    if (obst.m_confidence >= 0) {
+                    if (obst.m_confidence >= 2) {
 
-                        std::stringstream ss;
-                        ss << obst.m_initial_id;
-
-                        cv::putText(image, ss.str(),
-                                    cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2),
-                                    cv::FONT_HERSHEY_SIMPLEX, 0.33,
-                                    cv::Scalar(255, 0, 0));
 
                         cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
                         cv::circle(image, cv::Point(obst.m_filter.m_x[0] * zoom + res / 2, -obst.m_filter.m_x[1] * zoom + res / 2), 4, cv::Scalar(0, 0, 255), 2, 8, 0);
@@ -487,6 +493,14 @@ void PointcloudClustering::nextContainer(Container &c) {
                             cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),
                                             cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
                                             cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
+
+                        std::stringstream ss;
+                        ss << obst.m_initial_id;
+
+                        cv::putText(image, ss.str(),
+                                    cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2),
+                                    cv::FONT_HERSHEY_SIMPLEX, 0.33,
+                                    cv::Scalar(255, 255, 0));
 
                     }
                 }
@@ -528,14 +542,14 @@ void PointcloudClustering::nextContainer(Container &c) {
         }
         cv::line(image, cv::Point(res - 20 - zoom, res - 20), cv::Point(res - 20, res - 20), cv::Scalar(255, 255, 0), 1);
 
-        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(res / 2+50, res / 2),
+        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(res / 2 + 50, res / 2),
                         cv::Scalar(255, 255, 255), 1, 8, 0, 0.1);
 
-        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(res / 2, res / 2-50),
+        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(res / 2, res / 2 - 50),
                         cv::Scalar(255, 255, 255), 1, 8, 0, 0.1);
 
 
-        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(m_movement_x*3 * zoom + res / 2, -m_movement_y*3 * zoom + res / 2),
+        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(m_movement_x * 3 * zoom + res / 2, -m_movement_y * 3 * zoom + res / 2),
                         cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
 
 
@@ -544,11 +558,6 @@ void PointcloudClustering::nextContainer(Container &c) {
         ss << "../images/img" << m_itCount++ << ".png";
         //cv::imwrite(ss.str(), image);
 
-        cout << "Sending " << m_itCount << "-th time stamp data...";
-        TimeStamp ts(m_itCount, 2*m_itCount++);
-        Container c(ts);
-        getConference().send(c);
-        cout << "Sending " << m_itCount << "-th time stamp data... finished";
 
 //        for (auto &obst : m_obstacles) {
 //            opendlv::core::sensors::applanix::obstacles odvd_obst;
@@ -570,19 +579,36 @@ void PointcloudClustering::nextContainer(Container &c) {
         cv::waitKey(1);
 #endif
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        stringstream test;
+        for (auto &obst : m_obstacles) {
+            if (obst.m_confidence > 1) {
+                opendlv::core::sensors::applanix::obstacles tcp_obst;
+                tcp_obst.setPos_x(obst.m_filter.m_x[0]);
+                tcp_obst.setPos_y(obst.m_filter.m_x[1]);
+                tcp_obst.setTheta(obst.m_filter.m_x[2]);
+                tcp_obst.setSpeed(obst.m_filter.m_x[3]);
+                tcp_obst.setYaw_rate(obst.m_filter.m_x[4]);
+                tcp_obst.setType(obst.m_best_type);
+                tcp_obst.setObjId(obst.m_initial_id);
+                cout<<obst.m_initial_id<<endl;
+                tcp_obst << test;
+                test << "::-::";
+            }
+        }
 
+        try {
+            connection->send("startHere::"+test.str());
+
+        }
+        catch (string &exception) {
+            cerr << "Data could not be sent: " << exception << endl;
+        }
 
         double millis = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000.0;
         millis += std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1000000.0;
 
         std::cout << "Time difference = " << millis << std::endl;
 
-
-        cout << "Sending " << m_itCount << "-th time stamp data...";
-        TimeStamp ts(m_itCount, 2*m_itCount++);
-        Container c(ts);
-        getConference().send(c);
-        cout << "Sending " << m_itCount << "-th time stamp data... finished";
 
     }
 

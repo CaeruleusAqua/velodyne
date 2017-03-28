@@ -99,5 +99,6 @@ private:
     static constexpr float m_eps = 1000;
     static constexpr uint32_t m_minPts = 20;
     unsigned int m_id_counter = 0;
+    std::shared_ptr<odcore::io::tcp::TCPConnection> connection;
 
 };
