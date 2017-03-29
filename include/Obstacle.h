@@ -83,6 +83,7 @@ public:
     double m_mean_y=0;
     double m_old_mean_x=0;
     double m_old_mean_y=0;
+    bool initial_theta = false;
 
 
     Eigen::Vector2f m_movement_vector;

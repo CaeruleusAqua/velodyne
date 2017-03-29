@@ -402,7 +402,7 @@ void PointcloudClustering::nextContainer(Container &c) {
 #ifdef VIS
 
         const static int res = 1000;
-        const static int zoom = 12;
+        const static int zoom = 8;
 
         cv::Mat image(res, res, CV_8UC3, cv::Scalar(0, 0, 0));
 
@@ -467,7 +467,7 @@ void PointcloudClustering::nextContainer(Container &c) {
                     if (obst.m_confidence >= 0) {
 
 
-                        cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
+
                         cv::circle(image, cv::Point(obst.m_filter.m_x[0] * zoom + res / 2, -obst.m_filter.m_x[1] * zoom + res / 2), 4, cv::Scalar(0, 0, 255), 2, 8, 0);
                         if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
                             cv::arrowedLine(image, cv::Point(obst.m_filter.m_x[0] * zoom + res / 2, -obst.m_filter.m_x[1] * zoom + res / 2),
@@ -500,9 +500,11 @@ void PointcloudClustering::nextContainer(Container &c) {
                                          8);
 
                         if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
-                            cv::arrowedLine(image, cv::Point(obst.m_current_mean[0] * zoom + res / 2, -obst.m_current_mean[1] * zoom + res / 2),
+                            cv::arrowedLine(image, cv::Point(obst.m_mean_x * zoom + res / 2, -obst.m_mean_y * zoom + res / 2),
                                             cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
                                             cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
+
+                        cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
 
                         std::stringstream ss;
                         ss << obst.m_initial_id;
@@ -566,7 +568,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         cv::imshow("Lidar", image);
         stringstream ss;
         ss << "../images/img" << m_itCount++ << ".png";
-        //cv::imwrite(ss.str(), image);
+        cv::imwrite(ss.str(), image);
 
 
 //        for (auto &obst : m_obstacles) {
