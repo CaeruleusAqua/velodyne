@@ -342,8 +342,15 @@ void PointcloudClustering::nextContainer(Container &c) {
         Point3 cart = m_origin->transform(opendlv::data::environment::WGS84Coordinate(imu.getLat(), imu.getLon()));
 
 
-        m_x = cart.getX();
-        m_y = cart.getY();
+        if(imu.getRoll() > 1233){
+            m_x = imu.getLat();
+            m_y = imu.getLon();
+        }
+        else {
+            m_x = cart.getX();
+            m_y = cart.getY();
+        }
+
 
         //std::cout<<"X: "<<m_x<<std::endl;
         //std::cout<<"Y: "<<m_y<<std::endl;
@@ -370,6 +377,9 @@ void PointcloudClustering::nextContainer(Container &c) {
 
         m_movement_x = m_x - m_old_x;
         m_movement_y = m_y - m_old_y;
+        std::cout<<"m_movement_x: "<<m_movement_x<<endl;
+        std::cout<<"m_movement_y: "<<m_movement_y<<endl;
+
         m_old_x = m_x;
         m_old_y = m_y;
 
@@ -454,7 +464,7 @@ void PointcloudClustering::nextContainer(Container &c) {
 
 
                 if (true || obst.m_initial_id == 54) {
-                    if (obst.m_confidence >= 2) {
+                    if (obst.m_confidence >= 0) {
 
 
                         cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
@@ -581,7 +591,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         stringstream test;
         for (auto &obst : m_obstacles) {
-            if (obst.m_confidence > 1) {
+            if (obst.m_confidence >= 0) {
                 opendlv::core::sensors::applanix::obstacles tcp_obst;
                 tcp_obst.setPos_x(obst.m_filter.m_x[0]);
                 tcp_obst.setPos_y(obst.m_filter.m_x[1]);
@@ -590,7 +600,7 @@ void PointcloudClustering::nextContainer(Container &c) {
                 tcp_obst.setYaw_rate(obst.m_filter.m_x[4]);
                 tcp_obst.setType(obst.m_best_type);
                 tcp_obst.setObjId(obst.m_initial_id);
-                cout<<obst.m_initial_id<<endl;
+                //cout<<obst.m_initial_id<<endl;
                 tcp_obst << test;
                 test << "::-::";
             }

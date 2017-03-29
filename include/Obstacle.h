@@ -79,6 +79,10 @@ public:
     // 0 -unclassified ; 1 - Car ; 2 cycelist ; 3 - pedestrian
     int m_best_type=0;
     float m_max_height = 0;
+    double m_mean_x=0;
+    double m_mean_y=0;
+    double m_old_mean_x=0;
+    double m_old_mean_y=0;
 
 
     Eigen::Vector2f m_movement_vector;

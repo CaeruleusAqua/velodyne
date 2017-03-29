@@ -4,7 +4,7 @@
 #include <iostream>
 #include <opencv2/imgcodecs.hpp>
 
-LidarObstacle::LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_time,uint64_t id) : clusterCandidates(), m_filter(), m_width(), m_length() {
+LidarObstacle::LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_time, uint64_t id) : clusterCandidates(), m_filter(), m_width(), m_length() {
     m_latestTimestamp = current_time;
     m_state << cluster->m_center[0], cluster->m_center[1], 0;
     m_initial_id = id;
@@ -14,11 +14,11 @@ LidarObstacle::LidarObstacle(Cluster *cluster, odcore::data::TimeStamp current_t
     m_filter.init(cluster->m_center[0], cluster->m_center[1], 0, 0, 0);
 }
 
-bool LidarObstacle::confidenceIsZero(){
-    return m_confidence==0;
+bool LidarObstacle::confidenceIsZero() {
+    return m_confidence == 0;
 }
 
-double LidarObstacle::getDt(odcore::data::TimeStamp current_time){
+double LidarObstacle::getDt(odcore::data::TimeStamp current_time) {
     return (current_time - m_latestTimestamp).toMicroseconds() / 1000000.0d;
 }
 
@@ -51,6 +51,10 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
         x_mean /= values_num;
         y_mean /= values_num;
+        m_old_mean_x = m_mean_x;
+        m_old_mean_y = m_mean_y;
+        m_mean_x = x_mean;
+        m_mean_y = y_mean;
 
         float min_x = points.front()[0];
         float max_x = points.back()[0];
@@ -283,8 +287,8 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
         double speed = 0;
         if (oldPosX != 0 || oldPosY != 0) {
-            m_speed_x = 0.5 * ((m_current_mean[0]-movement_x - oldPosX) / dt) + m_speed_x * 0.5;
-            m_speed_y = 0.5 * ((m_current_mean[1]-movement_y - oldPosY) / dt) + m_speed_y * 0.5;
+            m_speed_x = 0.5 * ((m_current_mean[0] - movement_x - oldPosX) / dt) + m_speed_x * 0.5;
+            m_speed_y = 0.5 * ((m_current_mean[1] - movement_y - oldPosY) / dt) + m_speed_y * 0.5;
             speed = std::sqrt(m_speed_x * m_speed_x + m_speed_y * m_speed_y);
             if (speed > 100) {
                 speed = 0;
@@ -303,8 +307,12 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
         m_movement_vector += m_current_mean;
 
-        float dx = newPos[0] - m_state[0] + movement_x;
-        float dy = newPos[1] - m_state[1] + movement_y;
+        //float dx = newPos[0] - m_state[0] + movement_x;
+        //float dy = newPos[1] - m_state[1] + movement_y;
+
+
+        float dx = m_mean_x - m_old_mean_x + movement_x;
+        float dy = m_mean_y - m_old_mean_y + movement_y;
 
 
         float movement = std::sqrt((m_state[0] - newPos[0]) * (m_state[0] - newPos[0]) + (m_state[1] - newPos[1]) * (m_state[1] - newPos[1]));
@@ -328,7 +336,7 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         }
         yaw_rate /= dt;
 
-        m_filter.update(m_current_mean[0], m_current_mean[1], m_rectRot, speed, yaw_rate,movement_x,movement_y);
+        m_filter.update(m_current_mean[0], m_current_mean[1], m_rectRot, speed, yaw_rate, movement_x, movement_y);
 
 
         m_movement_vector_filtered[1] = std::sin(m_filter.m_x[2]) * m_filter.m_x[3];
@@ -349,7 +357,7 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 
         if (m_max_height > 4.5) {//building
             m_confidence /= 2;
-            type= 4;
+            type = 4;
         } else if ((m_best_width + 1.01 > m_best_length) && (type == 1 || type == 2)) {
             m_confidence--;
         } else if (m_best_width > 4 || m_best_length > 10) {
