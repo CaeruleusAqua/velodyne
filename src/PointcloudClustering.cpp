@@ -342,11 +342,10 @@ void PointcloudClustering::nextContainer(Container &c) {
         Point3 cart = m_origin->transform(opendlv::data::environment::WGS84Coordinate(imu.getLat(), imu.getLon()));
 
 
-        if(imu.getRoll() > 1233){
+        if (imu.getRoll() > 1233) {
             m_x = imu.getLat();
             m_y = imu.getLon();
-        }
-        else {
+        } else {
             m_x = cart.getX();
             m_y = cart.getY();
         }
@@ -377,8 +376,8 @@ void PointcloudClustering::nextContainer(Container &c) {
 
         m_movement_x = m_x - m_old_x;
         m_movement_y = m_y - m_old_y;
-        std::cout<<"m_movement_x: "<<m_movement_x<<endl;
-        std::cout<<"m_movement_y: "<<m_movement_y<<endl;
+        std::cout << "m_movement_x: " << m_movement_x << endl;
+        std::cout << "m_movement_y: " << m_movement_y << endl;
 
         m_old_x = m_x;
         m_old_y = m_y;
@@ -407,41 +406,12 @@ void PointcloudClustering::nextContainer(Container &c) {
         cv::Mat image(res, res, CV_8UC3, cv::Scalar(0, 0, 0));
 
 
-//        for (auto &layer : m_scenario->getListOfLayers()) {
-//            //cout << layer.getLongName() << endl;
-//            for (auto &road : layer.getListOfRoads()) {
-//                //cout << road.getLongName() << endl;
-//                for (auto &lane : road.getListOfLanes()) {
-//                    opendlv::data::scenario::LaneModel *model = lane.getLaneModel();
-//                    if (model->getType() == model->POINTMODEL) {
-//                        opendlv::data::scenario::PointModel *pointmodel = static_cast<opendlv::data::scenario::PointModel *>(model);
-//                        vector<opendlv::data::scenario::IDVertex3> vertexes = pointmodel->getListOfIdentifiableVertices();
-//                        bool first = false;
-//                        cv::Point oldPoint = cv::Point(0, 0);
-//                        for (auto &vertex : vertexes) {
-//                            cv::Point newPoint = cv::Point((vertex.getX() - m_x) * zoom + res / 2,
-//                                                           (-1 * (vertex.getY() - m_y)) * zoom + res / 2);
-//                            if (first) {
-//                                cv::line(image, oldPoint,
-//                                         newPoint, cv::Scalar(255, 255, 0), 1, 8, 0);
-//                            }
-//                            oldPoint = newPoint;
-//                            first = true;
-//                        }
-//                    }
-//
-//                }
-//            }
-//        }
-
-
         for (uint32_t i = 0; i < m_cloudSize; i++) {
             for (int j = 0; j < 16; j++) {
                 Point *point = &m_points[i][j];
                 int x = static_cast<int>(point->getX() * zoom) + res / 2;
                 int y = -static_cast<int>(point->getY() * zoom) + res / 2;
                 if ((x < res) && (y < res) && (y >= 0) && (x >= 0)) {
-                    // if (point->getMeasurement() > 1 && ( point->getPos()[3] <0  && point->getPos()[3] > -1)) {
                     if (point->isGround()) {
                         image.at<cv::Vec3b>(y, x)[0] = 0;
                         image.at<cv::Vec3b>(y, x)[1] = 0;
@@ -461,58 +431,60 @@ void PointcloudClustering::nextContainer(Container &c) {
         if (true) {
             cv::circle(image, cv::Point((m_x - m_old_x) * zoom + res / 2, -(m_y - m_old_y) * zoom + res / 2), 4, cv::Scalar(128, 255, 128), 2, 8, 0);
             for (auto &obst : m_obstacles) {
-
-
                 if (true || obst.m_initial_id == 54) {
                     if (obst.m_confidence >= 0) {
 
+                        if (obst.m_rectangle_center[0] != 0 && obst.m_rectangle_center[1] != 0) {
 
+                            ///// rectangles
 
-                        cv::circle(image, cv::Point(obst.m_filter.m_x[0] * zoom + res / 2, -obst.m_filter.m_x[1] * zoom + res / 2), 4, cv::Scalar(0, 0, 255), 2, 8, 0);
-                        if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
+                            if (obst.m_best_type == 0)
+                                for (int j = 0; j < 4; j++)
+                                    cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                             cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2),
+                                             cv::Scalar(255, 255, 255), 1, 8);
+
+                            else if (obst.m_best_type == 1)
+                                for (int j = 0; j < 4; j++)
+                                    cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                             cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2),
+                                             cv::Scalar(255, 0, 255),
+                                             1, 8);
+                            else if (obst.m_best_type == 2)
+                                for (int j = 0; j < 4; j++)
+                                    cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                             cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2),
+                                             cv::Scalar(0, 255, 255),
+                                             1, 8);
+                            else if (obst.m_best_type == 3)
+                                for (int j = 0; j < 4; j++)
+                                    cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
+                                             cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2),
+                                             cv::Scalar(255, 255, 0),
+                                             1, 8);
+
+                            ///////// movement vectors
+
                             cv::arrowedLine(image, cv::Point(obst.m_filter.m_x[0] * zoom + res / 2, -obst.m_filter.m_x[1] * zoom + res / 2),
                                             cv::Point(obst.m_movement_vector_filtered[0] * zoom + res / 2, -obst.m_movement_vector_filtered[1] * zoom + res / 2),
                                             cv::Scalar(0, 0, 255), 1, 8, 0, 0.1);
-                        //std::cout << "Type: " << obst.m_best_type << std::endl;
-                        if (obst.m_best_type == 0)
-                            for (int j = 0; j < 4; j++)
-                                cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
-                                         cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2),
-                                         cv::Scalar(255, 255, 255), 1,
-                                         8);
-                        else if (obst.m_best_type == 1)
-                            for (int j = 0; j < 4; j++)
-                                cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
-                                         cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 0, 255),
-                                         1,
-                                         8);
-                        else if (obst.m_best_type == 2)
-                            for (int j = 0; j < 4; j++)
-                                cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
-                                         cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(0, 255, 255),
-                                         1,
-                                         8);
-                        else if (obst.m_best_type == 3)
-                            for (int j = 0; j < 4; j++)
-                                cv::line(image, cv::Point(obst.m_rectangle[j][0] * zoom + res / 2, -obst.m_rectangle[j][1] * zoom + res / 2),
-                                         cv::Point(obst.m_rectangle[(j + 1) % 4][0] * zoom + res / 2, -obst.m_rectangle[(j + 1) % 4][1] * zoom + res / 2), cv::Scalar(255, 255, 0),
-                                         1,
-                                         8);
 
-                        if (obst.m_current_mean[0] != 0 && obst.m_current_mean[1] != 0)
                             cv::arrowedLine(image, cv::Point(obst.m_mean_x * zoom + res / 2, -obst.m_mean_y * zoom + res / 2),
                                             cv::Point(obst.m_movement_vector[0] * zoom + res / 2, -obst.m_movement_vector[1] * zoom + res / 2),
                                             cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
+
+                        }
+
+                        ///////// positions
+
+                        cv::circle(image, cv::Point(obst.m_filter.m_x[0] * zoom + res / 2, -obst.m_filter.m_x[1] * zoom + res / 2), 4, cv::Scalar(0, 0, 255), 2, 8, 0);
 
                         cv::circle(image, cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), 4, cv::Scalar(255, 0, 255), 2, 8, 0);
 
                         std::stringstream ss;
                         ss << obst.m_initial_id;
-
                         cv::putText(image, ss.str(),
-                                    cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2),
-                                    cv::FONT_HERSHEY_SIMPLEX, 0.33,
-                                    cv::Scalar(255, 255, 0));
+                                    cv::Point(obst.m_state[0] * zoom + res / 2, -obst.m_state[1] * zoom + res / 2), cv::FONT_HERSHEY_SIMPLEX, 0.33, cv::Scalar(255, 255, 0));
 
                     }
                 }
@@ -561,7 +533,7 @@ void PointcloudClustering::nextContainer(Container &c) {
                         cv::Scalar(255, 255, 255), 1, 8, 0, 0.1);
 
 
-        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(m_movement_x * 3 * zoom + res / 2, -m_movement_y * 3 * zoom + res / 2),
+        cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(m_movement_x * 10 * zoom + res / 2, -m_movement_y * 10 * zoom + res / 2),
                         cv::Scalar(255, 0, 255), 1, 8, 0, 0.1);
 
 
@@ -609,7 +581,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         }
 
         try {
-            connection->send("startHere::"+test.str());
+            connection->send("startHere::" + test.str());
 
         }
         catch (string &exception) {

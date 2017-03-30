@@ -65,13 +65,18 @@ private:
     }
 
 
+    void updateRectangle();
+
+
 public:
 
     int32_t m_confidence = 1;
     uint64_t m_initial_id = 0;
+    uint32_t image_counter = 0;
+
     double m_rectRot=0;
     double m_rectRot_old=0;
-    uint32_t image_counter = 0;
+
     double m_speed_x = 0;
     double m_speed_y = 0;
     float m_best_width = 0;
@@ -81,16 +86,20 @@ public:
     float m_max_height = 0;
     double m_mean_x=0;
     double m_mean_y=0;
-    double m_old_mean_x=0;
-    double m_old_mean_y=0;
     bool initial_theta = false;
 
 
     Eigen::Vector2f m_movement_vector;
     Eigen::Vector2f m_movement_vector_filtered;
-    Eigen::Vector2f m_current_mean;
-    Eigen::Matrix<double, 3, 1> m_state;
+
     Eigen::Vector2f m_rectangle[4];
+    Eigen::Vector2f m_rectangle_center;
+
+
+    Eigen::Matrix<double, 3, 1> m_state;
+
+
+
     Kalman m_filter;
 
     std::list<Cluster *> clusterCandidates;
