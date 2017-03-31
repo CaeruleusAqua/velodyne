@@ -149,7 +149,7 @@ void LidarObstacle::updateRectangle() {
         float lenght = getMostPropLenght(max_x - min_x);
 
         m_best_length = lenght;
-        m_best_width = lenght;
+        m_best_width = width;
 
         if ((min_x + max_x) / 2 > 0) {
             Rect(0, 0) = min_x;
@@ -370,25 +370,30 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
         if (speed > 10)
             m_confidence /= 2;
 
+
+        // 0 -unclassified ; 1 - Car ; 2 cycelist ; 3 - pedestrian
         int type = 0;
         if (m_best_length <= 1.5 && m_best_width <= 1.5) {
             type = 3;
         } else if (m_best_length <= 2 && m_best_width <= 1.5) {
             type = 2;
-        } else if (m_best_length <= 10 && m_best_width <= 4) {
+        } else if (m_best_length <= 7 && m_best_width <= 4) {
             type = 1;
         }
 
         m_best_type = type;
+        //std::cout << "Obst: "<<m_initial_id << std::endl;
+        //std::cout << "width: " << m_best_width << std::endl;
+        //std::cout << "length: " << m_best_length << std::endl;
 
         if (m_max_height > 4.5) {//building
             m_confidence /= 2;
             type = 4;
-        } else if ((m_best_width + 1.01 > m_best_length) && (type == 1 || type == 2)) {
-            m_confidence--;
-        } else if (m_best_width > 4 || m_best_length > 10) {
+        } else if (m_best_width > 4 || m_best_length > 7) {
+            //std::cout << "Confidence Wrong size! "  << std::endl;
             m_confidence /= 2;
         } else m_confidence++;
+
 
         if (m_initial_id == 54) {
             std::cout << "------------------------" << std::endl;
@@ -400,7 +405,7 @@ void LidarObstacle::refresh(double movement_x, double movement_y, odcore::data::
 //            std::cout << "movement_y: " << movement_y << std::endl;
             std::cout << "m_current_mean_x: " << m_rectangle_center[0] << std::endl;
             std::cout << "m_current_mean_y: " << m_rectangle_center[1] << std::endl;
-            std::cout << "kamlman_rot: " << m_filter.m_x[2] / M_PI * 180 << std::endl;
+            std::cout << "kalman_rot: " << m_filter.m_x[2] / M_PI * 180 << std::endl;
             std::cout << "m_rectRot: " << m_rectRot / M_PI * 180 << std::endl;
             std::cout << "Theta: " << m_state[2] / M_PI * 180 << std::endl;
             std::cout << "speed: " << speed << std::endl;

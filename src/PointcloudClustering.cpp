@@ -428,11 +428,14 @@ void PointcloudClustering::nextContainer(Container &c) {
         }
 
 
+
+
+
         if (true) {
             cv::circle(image, cv::Point((m_x - m_old_x) * zoom + res / 2, -(m_y - m_old_y) * zoom + res / 2), 4, cv::Scalar(128, 255, 128), 2, 8, 0);
             for (auto &obst : m_obstacles) {
                 if (true || obst.m_initial_id == 54) {
-                    if (obst.m_confidence >= 0) {
+                    if (obst.m_confidence >= 2) {
 
                         if (obst.m_rectangle_center[0] != 0 && obst.m_rectangle_center[1] != 0) {
 
@@ -524,6 +527,20 @@ void PointcloudClustering::nextContainer(Container &c) {
             }
 
         }
+
+
+        m_milliseconds += 100;
+        m_seconds += m_milliseconds / 1000;
+        m_milliseconds = m_milliseconds % 1000;
+        m_minutes += m_seconds / 60;
+        m_seconds = m_seconds % 60;
+        {
+            std::stringstream ss;
+            ss << "Stamp: " << m_minutes << ":" << m_seconds << ":" << m_milliseconds;
+            cv::putText(image, ss.str(),
+                        cv::Point(20, res - 20), cv::FONT_HERSHEY_SIMPLEX, 0.33, cv::Scalar(255, 255, 0));
+
+        }
         cv::line(image, cv::Point(res - 20 - zoom, res - 20), cv::Point(res - 20, res - 20), cv::Scalar(255, 255, 0), 1);
 
         cv::arrowedLine(image, cv::Point(res / 2, res / 2), cv::Point(res / 2 + 50, res / 2),
@@ -539,6 +556,10 @@ void PointcloudClustering::nextContainer(Container &c) {
 
         cv::imshow("Lidar", image);
         stringstream ss;
+
+
+
+
         ss << "../images/img" << m_itCount++ << ".png";
         cv::imwrite(ss.str(), image);
 
@@ -565,7 +586,7 @@ void PointcloudClustering::nextContainer(Container &c) {
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         stringstream test;
         for (auto &obst : m_obstacles) {
-            if (obst.m_confidence >= 0) {
+            if (obst.m_confidence >= 2) {
                 opendlv::core::sensors::applanix::obstacles tcp_obst;
                 tcp_obst.setPos_x(obst.m_filter.m_x[0]);
                 tcp_obst.setPos_y(obst.m_filter.m_x[1]);
@@ -590,6 +611,7 @@ void PointcloudClustering::nextContainer(Container &c) {
 
         double millis = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000.0;
         millis += std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1000000.0;
+
 
         std::cout << "Time difference = " << millis << std::endl;
 

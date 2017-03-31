@@ -101,4 +101,10 @@ private:
     unsigned int m_id_counter = 0;
     std::shared_ptr<odcore::io::tcp::TCPConnection> connection;
 
+
+    uint32_t m_minutes = 0;
+    uint32_t m_seconds = 0;
+    uint32_t m_milliseconds = 0;
+
+
 };
